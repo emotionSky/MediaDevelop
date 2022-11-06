@@ -412,6 +412,17 @@ namespace sip
 		}
 	}
 
+	static inline void SetContactUser(osip_message_t* msg, const char* user)
+	{
+		osip_contact_t* contact = NULL;
+		osip_message_get_contact(msg, 0, &contact);
+		osip_uri_t* uri = osip_contact_get_url(contact);
+		if (contact && uri)
+		{
+			osip_uri_set_username(uri, osip_strdup(user));
+		}
+	}
+
 	static inline void SetContactHost(osip_message_t* msg, const char* host)
 	{
 		osip_contact_t* contact = NULL;
@@ -477,8 +488,10 @@ namespace sip
 	 * @param[in] msg         sip消息结构体
 	 * @param[in] session_exp expires的内容，形如 60;refresher=uas    60;refresher=uac
 	 */
-	static inline void SetSessionExpires(osip_message_t* msg, const char* session_exp)
+	static inline void SetSessionExpires(osip_message_t* msg, bool isUac, int expire)
 	{
+		char session_exp[32] = { 0 };
+		sprintf(session_exp, "%d;refresher=%s", expire, isUac ? "uac" : "uas");
 		osip_message_set_header(msg, "Session-Expires", session_exp);
 	}
 	

@@ -36,4 +36,7 @@
 	#endif
 #endif
 
+#define SIP_ERROR   -1
+#define SIP_SUCCESS 0
+
 #endif // !__SIP_DEFINE_H__

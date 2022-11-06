@@ -36,6 +36,12 @@
     <ClInclude Include="..\include\SipDefine.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\internal\SipSend.h">
+      <Filter>头文件\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\ESipSend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\BaseSip.cpp">
@@ -48,6 +54,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="..\src\SipMessage.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\SipSend.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,6 +1,7 @@
 #ifndef __SIP_MESSAGE_HELPER_H__
 #define __SIP_MESSAGE_HELPER_H__
 
+#include <string>
 #include <cstring>
 #include <cstdio>
 
@@ -34,18 +35,45 @@ namespace sip
 #endif
 	}
 
-	/*
-	 * @brief 从sip的uri中解析出号码
-	 * @param[in]  str  uri，可能是from to subject等，形如 <sip:alice@10.1.1.21:1234>
-	 * @param[out] num  号码
-	 * @return void
-	 */
-	static inline void GetSipNumber(const char* str, char* num)
+	static inline std::string GetUserInUri(const char* uri)
 	{
-		if (str && num)
+		//uri   <sip:alice@10.10.1.12:5060>
+		std::string user;
+		if (uri)
 		{
-			sscanf(str, "<sip:%[^@]", num);
+			char buf[64] = { 0 };
+			int ret = sscanf(uri, "<sip:%[^@]", buf);
+
+			if (ret == 1)
+				user = buf;
 		}
+		return user;
+	}
+
+	static inline std::string GetUserInString(const char* str)
+	{
+		//str alice@10.10.1.12:5060
+		std::string user;
+		if (str)
+		{
+			char buf[64] = { 0 };
+			int ret = sscanf(str, "%[^@]", buf);
+			if (ret == 1)
+				user = buf;
+		}
+		return user;
+	}
+
+	static inline bool GetSipInfoInString(const char* str, char* user, char* host, int& port)
+	{
+		//str alice@10.10.1.12:5060
+		if (str)
+		{
+			int ret = sscanf(str, "%[^@]@%[^:]:%d", user, host, &port);
+			if (ret == 3)
+				return true;
+		}
+		return false;
 	}
 }
 

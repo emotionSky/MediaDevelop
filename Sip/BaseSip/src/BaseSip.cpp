@@ -1,6 +1,7 @@
 #include <eXosip2/eXosip.h>
 #include "internal/SipMessage.h"
 #include "internal/SipMessageHelper.h"
+#include "internal/SipSend.h"
 
 #if defined(WIN32) || defined(WIN64)
 #include <winsock2.h>
@@ -21,8 +22,13 @@ namespace sip
 	class BaseData
 	{
 	public:
-		BaseData() : m_bRunning(false), m_pThread(nullptr), m_pCtx(nullptr) {}
+		BaseData() : m_bRunning(false), m_localPort(0), m_pThread(nullptr), m_pCtx(nullptr) 
+		{
+			m_localHost = "127.0.0.0";
+		}
 		bool             m_bRunning;
+		int              m_localPort;
+		std::string      m_localHost;
 		std::thread*     m_pThread;
 		struct eXosip_t* m_pCtx;
 	};
@@ -87,7 +93,7 @@ namespace sip
 			return true;
 		}
 
-		if (host == nullptr || port <= 0)
+		if (port <= 0 || port > 65535)
 			return false;
 
 		bool ret = false;
@@ -113,8 +119,11 @@ namespace sip
 			if(agent)
 				eXosip_set_user_agent(m_pData->m_pCtx, agent);
 
-			ret = true;
+			if (host)
+				m_pData->m_localHost = host;
+			m_pData->m_localPort = port;
 			m_pCb = pCb;
+			ret = true;
 			break;
 		} while (true);
 
@@ -202,6 +211,186 @@ namespace sip
 		}
 	}
 
+	int BaseSip::SendRegister(ESipRegisterParams& params)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		SipRegisterParams* p = params.GetData();
+		if (!p->IsValid())
+			return SIP_ERROR;
+
+		osip_message_t* reg = nullptr;
+		std::string user = GetUserInString(p->m_from.c_str());
+		std::string from = std::string("sip:") + p->m_from;
+		std::string proxy = std::string("sip:") + p->m_to;
+
+		eXosip_lock(m_pData->m_pCtx);
+		/* 可能存在注册失败，然后添加代理处进行了密码的修改，这里就需要先删除原有的认证信息，然后替换修改后的认证信息 */
+		eXosip_remove_authentication_info(m_pData->m_pCtx, user.c_str(), nullptr);
+		eXosip_add_authentication_info(m_pData->m_pCtx, user.c_str(), user.c_str(), p->m_pwd.c_str(), "MD5", nullptr);
+		int rid = eXosip_register_build_initial_register(m_pData->m_pCtx,
+			from.c_str(),
+			proxy.c_str(),
+			nullptr,
+			p->m_expires,
+			&reg);
+
+		if (rid > 0)
+		{
+			if (!p->m_viaHost.empty())
+				SetViaHost(reg, p->m_viaHost.c_str());
+			if (p->m_viaPort > 0)
+				SetViaPort(reg, p->m_viaPort);
+			if (!p->m_contact.empty())
+			{
+				char user[64], host[64];
+				int port;
+				if (GetSipInfoInString(p->m_contact.c_str(), user, host, port))
+				{
+					SetContactUser(reg, user);
+					SetContactHost(reg, host);
+					SetContactPort(reg, port);
+				}
+			}
+			eXosip_register_send_register(m_pData->m_pCtx, rid, reg);
+		}
+		eXosip_unlock(m_pData->m_pCtx);
+		
+		if (rid > 0)
+		{
+			p->m_callid = GetCallidNumber(reg);
+			p->m_rid = rid;
+			return SIP_SUCCESS;
+		}
+		
+		return SIP_ERROR;
+	}
+
+	int BaseSip::RefreshRegister(int rid, int expires)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		osip_message_t* reg = nullptr;
+		eXosip_lock(m_pData->m_pCtx);
+		eXosip_register_build_register(m_pData->m_pCtx, rid, expires, &reg);
+		if (reg)
+			eXosip_register_send_register(m_pData->m_pCtx, rid, reg);
+
+		eXosip_unlock(m_pData->m_pCtx);
+		return SIP_SUCCESS;
+	}
+
+	int BaseSip::UpdateRegisterPwd(const char* user, const char* newPwd)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		eXosip_lock(m_pData->m_pCtx);
+		eXosip_remove_authentication_info(m_pData->m_pCtx, user, nullptr);
+		eXosip_add_authentication_info(m_pData->m_pCtx, user, user, newPwd, "MD5", nullptr);
+		eXosip_unlock(m_pData->m_pCtx);
+
+		return SIP_SUCCESS;
+	}
+
+	int BaseSip::SendInvite(ESipCallParams& params)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		SipCallParams* p = params.GetData();
+		if (!p->IsValid())
+			return SIP_ERROR;
+
+		std::string from = std::string("sip:") + p->m_from;
+		std::string to = std::string("sip:") + p->m_to;
+
+		osip_message_t* invite = nullptr;
+		eXosip_lock(m_pData->m_pCtx);
+		int ret = eXosip_call_build_initial_invite(m_pData->m_pCtx,
+			&invite,
+			to.c_str(),
+			from.c_str(),
+			nullptr,
+			p->m_subject.c_str());
+
+		/* 创建失败就返回 */
+		if (ret != OSIP_SUCCESS)
+			return SIP_ERROR;
+
+		if (!p->m_viaHost.empty())
+			SetViaHost(invite, p->m_viaHost.c_str());
+		if (p->m_viaPort > 0)
+			SetViaPort(invite, p->m_viaPort);
+		if (!p->m_contact.empty())
+		{
+			char user[64], host[64];
+			int port;
+			if (GetSipInfoInString(p->m_contact.c_str(), user, host, port))
+			{
+				SetContactUser(invite, user);
+				SetContactHost(invite, host);
+				SetContactPort(invite, port);
+			}
+		}
+		SetSessionExpires(invite, p->m_bIsUacRefresh, p->m_expires);
+
+		for(auto iter = p->m_headers.begin(); iter !=p->m_headers.end(); ++iter)
+			osip_message_replace_header(invite, iter->first.c_str(), iter->second.c_str());
+	
+		p->m_callid = GetCallidNumber(invite);
+
+		if (p->m_sdp.size() > 0)
+		{
+			osip_message_set_content_type(invite, "application/sdp");
+			osip_message_set_body(invite, p->m_sdp.c_str(), p->m_sdp.size());
+		}
+
+		p->m_cid = eXosip_call_send_initial_invite(m_pData->m_pCtx, invite);
+		eXosip_unlock(m_pData->m_pCtx);
+
+		return SIP_SUCCESS;
+	}
+
+	int BaseSip::SendRinging(ESipCallResponseParams& params)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		SipCallResponseParams* p = params.GetData();
+		if (!p->IsValid())
+			return SIP_ERROR;
+
+		
+		osip_message_t* answer = nullptr;
+		eXosip_call_build_answer(m_pData->m_pCtx, p->m_tid, 180, &answer); //这里直接写死180
+
+		if(p->m_via.size() > 0)
+			SetVia(answer, p->m_via.c_str());
+		if (!p->m_contact.empty())
+		{
+			char user[64], host[64];
+			int port;
+			if (GetSipInfoInString(p->m_contact.c_str(), user, host, port))
+			{
+				SetContactUser(answer, user);
+				SetContactHost(answer, host);
+				SetContactPort(answer, port);
+			}
+		}
+		for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			osip_message_replace_header(answer, iter->first.c_str(), iter->second.c_str());
+
+		eXosip_lock(m_pData->m_pCtx);
+		eXosip_call_send_answer(m_pData->m_pCtx, p->m_tid, 180, answer);
+		eXosip_unlock(m_pData->m_pCtx);
+
+		return SIP_SUCCESS;
+	}
+
+	//BaseSip::
 	static void ParseSipMsgInfo(SipMsgInfo& info, osip_message_t* msg)
 	{
 		info.m_expires = GetExpires(msg);
