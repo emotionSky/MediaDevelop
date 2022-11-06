@@ -11,21 +11,9 @@
 
 namespace sip
 {
-	/*
-	 * 本文件中，所有函数返回值为 char* 均需要调用 SipFree 进行内存释放！ 
-	 */
-
-
 	/**************************************** Memory operation ****************************************/
-	static inline char* SipMalloc(int len)
-	{
-		return (char*)osip_malloc(len);
-	}
-
-	static inline void SipFree(char* buf)
-	{
-		osip_free(buf);
-	}
+	void* SipMalloc(int len);
+	void SipFree(void* buf);
 
 
 	/**************************************** Get message info ****************************************/

@@ -145,10 +145,13 @@
     <ClInclude Include="..\include\internal\SipCommon.h" />
     <ClInclude Include="..\include\internal\SipMessage.h" />
     <ClInclude Include="..\include\internal\SipMessageHelper.h" />
+    <ClInclude Include="..\include\ISipRecv.h" />
+    <ClInclude Include="..\include\SipDefine.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\BaseSip.cpp" />
     <ClCompile Include="..\src\SipCommon.cpp" />
+    <ClCompile Include="..\src\SipMessage.cpp" />
     <ClCompile Include="..\src\SipMessageHelper.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

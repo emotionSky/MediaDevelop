@@ -1,63 +1,41 @@
 #ifndef __BASE_SIP_H__
 #define __BASE_SIP_H__
 
-#define PRINT_MACRO_HELPER(x)  #x
-#define PRINT_MACRO(x)         #x "=" PRINT_MACRO_HELPER(x)
-
-#if defined WIN32 || defined _WINDLL || defined __CYGWIN__
-	#if defined BASESIP_EXPORTS
-		#if defined __GNUC__ || defined __clang__
-			#pragma message("log exports in gnuc-win.")
-			#define BASESIP_API           __attribute__ ((dllexport))
-		#elif defined _MSC_VER
-			#pragma message("log exports in msvc-win.")
-			#define BASESIP_API           __declspec(dllexport)
-		#else
-			#define BASESIP_API
-		#endif
-	#else
-		#if defined                        __GNUC__ || defined __clang__
-			#define BASESIP_API           __attribute__ ((dllimport))
-		#elif defined _MSC_VER
-			#define BASESIP_API           __declspec(dllimport)
-		#else
-			#define BASESIP_API
-		#endif
-	#endif
-#else
-	#if defined BASESIP_EXPORTS
-		#if                                __GNUC__ >= 4 || defined __clang__
-			#pragma message("log exports in gnuc-unix.")
-			#define BASESIP_API           __attribute__((visibility ("default")))
-		#else
-			#define BASESIP_API
-		#endif
-	#else
-		#define BASESIP_API
-	#endif
-#endif
-
-
+#include "ISipRecv.h"
 #include <string>
 
 namespace sip
 {
 	class BaseData;
-	class DREAMSKY_API BaseSip
+	class BASESIP_API BaseSip
 	{
-	public:
+	private:
 		BaseSip();
-		~BaseSip();
 
-		bool Init(const char* host, int port);
-		bool Init(const char* host, int port, int family, bool bIsUdp, bool bIsSecure);
+	public:
+		~BaseSip();
+		static BaseSip* Instance();
+		static void Destroy();
+
+		bool Init(const char* host, int port, const char* agent, ISipRecv* pCb);
+		bool Init(const char* host, int port, const char* agent, int family, bool bIsUdp, bool bIsSecure, ISipRecv* pCb);
+		void DealCallBack(void* pMsg);
 		void Release();
 		void StartSip();
 		void StopSip();
-
 		void Run();
 
 	private:
+		void DealEvt(void* pEvt);		
+		void DealMessage(const char* method, void* pEvt);
+		void DealMessageResponse(const char* method, void* pEvt);
+		void DealCallMessage(const char* methed, void* pEvt);
+		void DealCallMessageResponse(const char* method, void* pEvt);
+		void DealSubscribeTimeout(const char* method, void* pEvt);
+		void DealSubscribeResponse(const char* method, void* pEvt);
+
+	private:
+		ISipRecv* m_pCb;
 		BaseData* m_pData;
 	};
 }
