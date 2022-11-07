@@ -157,6 +157,11 @@ namespace sip
 		m_pData->m_statusCode = code;
 	}
 
+	void ESipCallResponseParams::SetSdp(const std::string& sdp)
+	{
+		m_pData->m_sdp = sdp;
+	}
+
 	void ESipCallResponseParams::SetVia(const std::string& via)
 	{
 		m_pData->m_via = via;

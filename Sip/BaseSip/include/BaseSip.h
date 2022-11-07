@@ -5,8 +5,6 @@
 #include "ESipSend.h"
 #include <string>
 
-template class __declspec(dllexport) std::basic_string<char, std::char_traits<char>, std::allocator<char> >;
-
 namespace sip
 {
 	class BaseData;
@@ -39,8 +37,10 @@ namespace sip
 		int SendRegister(ESipRegisterParams& params);
 		int RefreshRegister(int rid, int expires);
 		int UpdateRegisterPwd(const char* user, const char* newPwd);
+		int SendRegisterResponse(int tid, int statusCode);
 		int SendInvite(ESipCallParams& params);
 		int SendRinging(ESipCallResponseParams& params);
+		int SendInviteResponse(ESipCallResponseParams& params);
 		
 	private:
 		void DealEvt(void* pEvt);		
@@ -54,7 +54,6 @@ namespace sip
 	private:
 		ISipRecv* m_pCb;
 		BaseData* m_pData;
-		std::string m_info;
 	};
 }
 

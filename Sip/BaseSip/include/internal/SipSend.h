@@ -102,6 +102,7 @@ namespace sip
 		int m_tid;
 		int m_statusCode;
 		std::string m_contact;
+		std::string m_sdp;
 		std::string m_via;
 		std::map<std::string, std::string> m_headers;
 	};

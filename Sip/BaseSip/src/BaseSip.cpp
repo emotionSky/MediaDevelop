@@ -295,6 +295,18 @@ namespace sip
 		return SIP_SUCCESS;
 	}
 
+	int BaseSip::SendRegisterResponse(int tid, int statusCode)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		eXosip_lock(m_pData->m_pCtx);
+		eXosip_message_send_answer(m_pData->m_pCtx, tid, statusCode, nullptr);
+		eXosip_unlock(m_pData->m_pCtx);
+
+		return SIP_SUCCESS;
+	}
+
 	int BaseSip::SendInvite(ESipCallParams& params)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
@@ -362,9 +374,9 @@ namespace sip
 		SipCallResponseParams* p = params.GetData();
 		if (!p->IsValid())
 			return SIP_ERROR;
-
 		
 		osip_message_t* answer = nullptr;
+		eXosip_lock(m_pData->m_pCtx);
 		eXosip_call_build_answer(m_pData->m_pCtx, p->m_tid, 180, &answer); //这里直接写死180
 
 		if(p->m_via.size() > 0)
@@ -383,8 +395,48 @@ namespace sip
 		for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
 			osip_message_replace_header(answer, iter->first.c_str(), iter->second.c_str());
 
-		eXosip_lock(m_pData->m_pCtx);
 		eXosip_call_send_answer(m_pData->m_pCtx, p->m_tid, 180, answer);
+		eXosip_unlock(m_pData->m_pCtx);
+
+		return SIP_SUCCESS;
+	}
+
+	int BaseSip::SendInviteResponse(ESipCallResponseParams& params)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return SIP_ERROR;
+
+		SipCallResponseParams* p = params.GetData();
+		if (!p->IsValid())
+			return SIP_ERROR;
+
+		osip_message_t* answer = nullptr;
+		eXosip_lock(m_pData->m_pCtx);
+		eXosip_call_build_answer(m_pData->m_pCtx, p->m_tid, p->m_statusCode, &answer);
+
+		if (p->m_statusCode == 200)
+		{
+			osip_message_set_content_type(answer, "application/sdp");
+			osip_message_set_body(answer, p->m_sdp.c_str(), p->m_sdp.size());
+		}
+
+		if (p->m_via.size() > 0)
+			SetVia(answer, p->m_via.c_str());
+		if (!p->m_contact.empty())
+		{
+			char user[64], host[64];
+			int port;
+			if (GetSipInfoInString(p->m_contact.c_str(), user, host, port))
+			{
+				SetContactUser(answer, user);
+				SetContactHost(answer, host);
+				SetContactPort(answer, port);
+			}
+		}
+		for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			osip_message_replace_header(answer, iter->first.c_str(), iter->second.c_str());
+
+		eXosip_call_send_answer(m_pData->m_pCtx, p->m_tid, p->m_statusCode, answer);
 		eXosip_unlock(m_pData->m_pCtx);
 
 		return SIP_SUCCESS;

@@ -75,6 +75,9 @@ namespace sip
 		void SetTid(int tid);
 		void SetStatusCode(int code);
 
+		/* invite的响应使用 */
+		void SetSdp(const std::string& sdp);
+
 		/* 可选配置参数 */
 		void SetVia(const std::string& via);            //这里必须给via的所有字段了
 		void SetContact(const std::string& contact);    //contact:  alice:10.1.10.23:5060
