@@ -50,8 +50,12 @@ namespace sip
 		virtual int OnRecvUpdateResponse(const SipMsgInfo& info) = 0;
 		virtual int OnRecvMessage(const SipMsgInfo& info) = 0;
 		virtual int OnRecvMessageResponse(const SipMsgInfo& info) = 0;
+		virtual int OnRecvInfo(const SipMsgInfo& info) = 0;
+		virtual int OnRecvInfoResponse(const SipMsgInfo& info) = 0;
 		virtual int OnRecvCallMessage(const SipMsgInfo& info) = 0;
 		virtual int OnRecvCallMessageResponse(const SipMsgInfo& info) = 0;
+		virtual int OnRecvCallInfo(const SipMsgInfo& info) = 0;
+		virtual int OnRecvCallInfoResponse(const SipMsgInfo& info) = 0;
 		virtual int OnRecvSubscribe(const SipMsgInfo& info) = 0;
 		virtual int OnRecvSubScribeTimeout(const SipMsgInfo& info) = 0;
 		virtual int OnRecvSubscribeResponse(const SipMsgInfo& info) = 0;

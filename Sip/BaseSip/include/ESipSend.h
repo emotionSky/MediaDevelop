@@ -49,6 +49,7 @@ namespace sip
 		void SetSdp(const std::string& sdp);         //sdp
 
 		/* 可选配置参数 */
+		void SetRoute(const std::string& route);        //route:  Bob:10.1.10.43:5060
 		void SetVia(const std::string& host, int port); //只配置via的host和端口
 		void SetContact(const std::string& contact);    //contact:  alice:10.1.10.23:5060
 		void AddHeaders(const std::string& key, const std::string& value);
@@ -88,6 +89,31 @@ namespace sip
 
 	private:
 		SipCallResponseParams* m_pData;
+	};
+
+	class SipMessageParams;
+	class ESipMessageParams
+	{
+	public:
+		ESipMessageParams();
+		~ESipMessageParams();
+
+		/* 配置参数 */
+		void SetFrom(const std::string& from);       //from:  alice:10.1.10.21:5060
+		void SetTo(const std::string& to);           //to:  Bob:10.1.10.43:5060
+		void SetContent(const std::string& type, const std::string& content);
+
+		/* 可选配置参数 */
+		void SetRoute(const std::string& route);        //route:  Bob:10.1.10.43:5060
+		void SetVia(const std::string& host, int port); //只配置via的host和端口
+		void SetContact(const std::string& contact);    //contact:  alice:10.1.10.23:5060
+		void AddHeaders(const std::string& key, const std::string& value);
+
+		/* 限库内使用 */
+		SipMessageParams* GetData(); //外部调用无法使用
+
+	private:
+		SipMessageParams* m_pData;
 	};
 }
 

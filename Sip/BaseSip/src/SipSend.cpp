@@ -102,6 +102,11 @@ namespace sip
 		m_pData->m_sdp = sdp;
 	}
 
+	void ESipCallParams::SetRoute(const std::string& route)
+	{
+		m_pData->m_route = route;
+	}
+
 	void ESipCallParams::SetVia(const std::string& host, int port)
 	{
 		m_pData->m_viaHost = host;
@@ -182,4 +187,59 @@ namespace sip
 		return m_pData;
 	}
 
+	ESipMessageParams::ESipMessageParams()
+	{
+		m_pData = new SipMessageParams();
+	}
+
+	ESipMessageParams::~ESipMessageParams()
+	{
+		if (m_pData)
+		{
+			delete m_pData;
+			m_pData = nullptr;
+		}
+	}
+
+	void ESipMessageParams::SetFrom(const std::string& from)
+	{
+		m_pData->m_from = from;
+	}
+
+	void ESipMessageParams::SetTo(const std::string& to)
+	{
+		m_pData->m_to = to;
+	}
+
+	void ESipMessageParams::SetContent(const std::string& type, const std::string& content)
+	{
+		m_pData->m_type = type;
+		m_pData->m_content = content;
+	}
+
+	void ESipMessageParams::SetRoute(const std::string& route)
+	{
+		m_pData->m_route = route;
+	}
+
+	void ESipMessageParams::SetVia(const std::string& host, int port)
+	{
+		m_pData->m_viaHost = host;
+		m_pData->m_viaPort = port;
+	}
+
+	void ESipMessageParams::SetContact(const std::string& contact)
+	{
+		m_pData->m_contact = contact;
+	}
+
+	void ESipMessageParams::AddHeaders(const std::string& key, const std::string& value)
+	{
+		m_pData->m_headers[key] = value;
+	}
+
+	SipMessageParams* ESipMessageParams::GetData()
+	{
+		return m_pData;
+	}
 }

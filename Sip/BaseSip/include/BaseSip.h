@@ -38,9 +38,13 @@ namespace sip
 		int RefreshRegister(int rid, int expires);
 		int UpdateRegisterPwd(const char* user, const char* newPwd);
 		int SendRegisterResponse(int tid, int statusCode);
+		int SendOptions(ESipMessageParams& params);
 		int SendInvite(ESipCallParams& params);
 		int SendRinging(ESipCallResponseParams& params);
 		int SendInviteResponse(ESipCallResponseParams& params);
+		int RemoveRegister(int rid);
+		int RemoveSubscribe(int did); //outgoing
+		int RemoveInSubscribe(int did); //incoming
 		
 	private:
 		void DealEvt(void* pEvt);		

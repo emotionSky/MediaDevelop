@@ -68,6 +68,7 @@ namespace sip
 		bool m_bIsUacRefresh;
 		std::string m_from;
 		std::string m_to;
+		std::string m_route;
 		std::string m_subject;
 		std::string m_contact;
 		std::string m_viaHost;
@@ -104,6 +105,34 @@ namespace sip
 		std::string m_contact;
 		std::string m_sdp;
 		std::string m_via;
+		std::map<std::string, std::string> m_headers;
+	};
+
+	class SipMessageParams
+	{
+	public:
+		SipMessageParams()
+		{
+			m_viaPort = 0;
+		}
+
+		bool IsValid()
+		{
+			if (m_from.empty() || m_to.empty())
+				return false;
+
+			return true;
+		}
+
+		/* in */
+		std::string m_from;
+		std::string m_to;
+		std::string m_route;
+		std::string m_contact;
+		std::string m_type;
+		std::string m_content;
+		std::string m_viaHost;
+		int m_viaPort;
 		std::map<std::string, std::string> m_headers;
 	};
 }
