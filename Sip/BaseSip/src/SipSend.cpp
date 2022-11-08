@@ -102,6 +102,11 @@ namespace sip
 		m_pData->m_sdp = sdp;
 	}
 
+	void ESipCallParams::SetDid(int did)
+	{
+		m_pData->m_did = did;
+	}
+
 	void ESipCallParams::SetRoute(const std::string& route)
 	{
 		m_pData->m_route = route;
@@ -211,9 +216,10 @@ namespace sip
 		m_pData->m_to = to;
 	}
 
-	void ESipMessageParams::SetContent(const std::string& type, const std::string& content)
+	void ESipMessageParams::SetContent(const std::string& type, const std::string& encoding, const std::string& content)
 	{
 		m_pData->m_type = type;
+		m_pData->m_endcoding = encoding;
 		m_pData->m_content = content;
 	}
 
@@ -239,6 +245,117 @@ namespace sip
 	}
 
 	SipMessageParams* ESipMessageParams::GetData()
+	{
+		return m_pData;
+	}
+
+	ESipCallMessageParams::ESipCallMessageParams()
+	{
+		m_pData = new SipCallMessageParams();
+	}
+
+	ESipCallMessageParams::~ESipCallMessageParams()
+	{
+		if (m_pData)
+		{
+			delete m_pData;
+			m_pData = nullptr;
+		}
+	}
+
+	void ESipCallMessageParams::SetDid(int did)
+	{
+		m_pData->m_did = did;
+	}
+
+	void ESipCallMessageParams::SetContent(const std::string& type, const std::string& encoding, const std::string& content)
+	{
+		m_pData->m_type = type;
+		m_pData->m_endcoding = encoding;
+		m_pData->m_content = content;
+	}
+
+	void ESipCallMessageParams::AddHeaders(const std::string& key, const std::string& value)
+	{
+		m_pData->m_headers[key] = value;
+	}
+
+	SipCallMessageParams* ESipCallMessageParams::GetData()
+	{
+		return m_pData;
+	}
+
+	ESipSuscribeParams::ESipSuscribeParams()
+	{
+		m_pData = new SipSuscribeParams();
+	}
+
+	ESipSuscribeParams::~ESipSuscribeParams()
+	{
+		if (m_pData)
+		{
+			delete m_pData;
+			m_pData = nullptr;
+		}
+	}
+
+	void ESipSuscribeParams::SetEvent(const std::string& event)
+	{
+		m_pData->m_event = event;
+	}
+
+	void ESipSuscribeParams::SetFrom(const std::string& from)
+	{
+		m_pData->m_from = from;
+	}
+
+	void ESipSuscribeParams::SetTo(const std::string& to)
+	{
+		m_pData->m_to = to;
+	}
+
+	void ESipSuscribeParams::SetSubject(const std::string& subject)
+	{
+		m_pData->m_subject = subject;
+	}
+
+	void ESipSuscribeParams::SetExpires(int expires)
+	{
+		m_pData->m_expires = expires;
+	}
+
+	void ESipSuscribeParams::SetRoute(const std::string& route)
+	{
+		m_pData->m_route = route;
+	}
+
+	void ESipSuscribeParams::SetVia(const std::string& host, int port)
+	{
+		m_pData->m_viaHost = host;
+		m_pData->m_viaPort = port;
+	}
+
+	void ESipSuscribeParams::SetContact(const std::string& contact)
+	{
+		m_pData->m_contact = contact;
+	}
+
+	void ESipSuscribeParams::AddHeaders(const std::string& key, const std::string& value)
+	{
+		m_pData->m_headers[key] = value;
+	}
+
+	const std::string& ESipSuscribeParams::GetCallid() const
+	{
+		return m_pData->m_callid;
+	}
+
+	const int& ESipSuscribeParams::GetSid() const
+	{
+		return m_pData->m_sid;
+	}
+
+	SipSuscribeParams* ESipSuscribeParams::GetData()
 	{
 		return m_pData;
 	}

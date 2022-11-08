@@ -296,6 +296,11 @@ namespace sip
 		return false;
 	}
 
+	static inline void SetContentEncoding(osip_message_t* msg, const char* encoding)
+	{
+		osip_message_set_content_encoding(msg, encoding);
+	}
+
 	static inline void SetContent(osip_message_t* msg, const char* content, size_t len)
 	{
 		if (!content || len == 0)
@@ -412,6 +417,27 @@ namespace sip
 		}
 	}
 
+	static inline void SetContact(osip_message_t* msg, const char* str)
+	{
+		if (str)
+		{
+			char user[64], host[32], port[16];
+			int ret = sscanf(str, "%[^@]@%[^:]:%s", user, host, port);
+			if (ret == 3)
+			{
+				osip_contact_t* contact = NULL;
+				osip_message_get_contact(msg, 0, &contact);
+				osip_uri_t* uri = osip_contact_get_url(contact);
+				if (contact && uri)
+				{
+					osip_uri_set_username(uri, osip_strdup(user));
+					osip_uri_set_host(uri, osip_strdup(host));
+					osip_uri_set_host(uri, osip_strdup(port));
+				}
+			}
+		}
+	}
+
 	static inline void SetContactUser(osip_message_t* msg, const char* user)
 	{
 		osip_contact_t* contact = NULL;
@@ -445,11 +471,6 @@ namespace sip
 			sprintf(p, "%d", port);
 			osip_uri_set_host(uri, osip_strdup(p));
 		}
-	}
-
-	static inline void SetContentEncoding(osip_message_t* msg, const char* encoding)
-	{
-		osip_message_set_content_encoding(msg, encoding);
 	}
 
 	/*
@@ -494,6 +515,30 @@ namespace sip
 		sprintf(session_exp, "%d;refresher=%s", expire, isUac ? "uac" : "uas");
 		osip_message_set_header(msg, "Session-Expires", session_exp);
 	}
+
+	static inline void SetRequestUri(osip_message_t* msg, const char* uri)
+	{
+		char user[64], host[32], port[16];
+		int ret = sscanf(uri, "%[^@]@%[^:]:%s", user, host, port);
+		if (ret == 3)
+		{
+			char* p = nullptr;
+			p = osip_uri_get_username(msg->req_uri);
+			if (p)
+				SipFree(p);
+			osip_uri_set_username(msg->req_uri, osip_strdup(user));
+
+			p = osip_uri_get_host(msg->req_uri);
+			if (p)
+				SipFree(p);
+			osip_uri_set_host(msg->req_uri, osip_strdup(host));
+
+			p = osip_uri_get_port(msg->req_uri);
+			if (p)
+				SipFree(p);
+			osip_uri_set_host(msg->req_uri, osip_strdup(port));
+		}
+	}
 	
 	static inline void SetRequestUriUser(osip_message_t* msg, const char* user)
 	{
@@ -508,11 +553,23 @@ namespace sip
 	static inline void SetRequestUriHost(osip_message_t* msg, const char* host)
 	{
 		char* oldHost = osip_uri_get_host(msg->req_uri);
-		if (host)
+		if (oldHost)
 		{
 			SipFree(oldHost);
 		}
 		osip_uri_set_host(msg->req_uri, osip_strdup(host));
+	}
+
+	static inline void SetRequestUriPort(osip_message_t* msg, int port)
+	{
+		char* oldPort = osip_uri_get_port(msg->req_uri);
+		if (oldPort)
+		{
+			SipFree(oldPort);
+		}
+		char buf[16];
+		sprintf(buf, "%d", port);
+		osip_uri_set_host(msg->req_uri, osip_strdup(buf));
 	}
 
 	/**************************************** Get sdp info ****************************************/

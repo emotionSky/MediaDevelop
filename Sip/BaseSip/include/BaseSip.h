@@ -42,9 +42,22 @@ namespace sip
 		int SendInvite(ESipCallParams& params);
 		int SendRinging(ESipCallResponseParams& params);
 		int SendInviteResponse(ESipCallResponseParams& params);
+		int SendAck(ESipCallParams& params);
+		int SendUpdate(ESipCallParams& params);
+		int SendMessage(ESipMessageParams& params);
+		int SendInfo(ESipMessageParams& params);
+		int SendCallOptions(ESipCallMessageParams& params);
+		int SendCallMessage(ESipCallMessageParams& params);
+		int SendCallInfo(ESipCallMessageParams& params);
+		int SendSubscribe(ESipSuscribeParams& params);
+		int SendSubscribeResponse(int tid, int statusCode);
 		int RemoveRegister(int rid);
 		int RemoveSubscribe(int did); //outgoing
 		int RemoveInSubscribe(int did); //incoming
+
+	private:
+		int SendMessageMethod(ESipMessageParams& params, const char* method);
+		int SendCallMessageMethod(ESipCallMessageParams& params, const char* method);
 		
 	private:
 		void DealEvt(void* pEvt);		

@@ -47,6 +47,7 @@ namespace sip
 		void SetSubject(const std::string& subject); //subject: 形式比较任意，常用为 kevin@10.1.21.23:5060
 		void SetExpires(bool isUacRefresh, int expires); //注册的截止时间，单位为秒
 		void SetSdp(const std::string& sdp);         //sdp
+		void SetDid(int did); //对话id
 
 		/* 可选配置参数 */
 		void SetRoute(const std::string& route);        //route:  Bob:10.1.10.43:5060
@@ -101,7 +102,7 @@ namespace sip
 		/* 配置参数 */
 		void SetFrom(const std::string& from);       //from:  alice:10.1.10.21:5060
 		void SetTo(const std::string& to);           //to:  Bob:10.1.10.43:5060
-		void SetContent(const std::string& type, const std::string& content);
+		void SetContent(const std::string& type, const std::string& encoding, const std::string& content);
 
 		/* 可选配置参数 */
 		void SetRoute(const std::string& route);        //route:  Bob:10.1.10.43:5060
@@ -114,6 +115,58 @@ namespace sip
 
 	private:
 		SipMessageParams* m_pData;
+	};
+
+	class SipCallMessageParams;
+	class ESipCallMessageParams
+	{
+	public:
+		ESipCallMessageParams();
+		~ESipCallMessageParams();
+
+		/* 配置参数 */
+		void SetDid(int did);
+		void SetContent(const std::string& type, const std::string& encoding, const std::string& content);
+
+		/* 可选配置参数 */
+		void AddHeaders(const std::string& key, const std::string& value);
+
+		/* 限库内使用 */
+		SipCallMessageParams* GetData(); //外部调用无法使用
+
+	private:
+		SipCallMessageParams* m_pData;
+	};
+
+	class SipSuscribeParams;
+	class ESipSuscribeParams
+	{
+	public:
+		ESipSuscribeParams();
+		~ESipSuscribeParams();
+
+		/* 配置参数 */
+		void SetEvent(const std::string& event); //event:  presence
+		void SetFrom(const std::string& from);       //from:  alice:10.1.10.21:5060
+		void SetTo(const std::string& to);           //to:  Bob:10.1.10.43:5060
+		void SetSubject(const std::string& subject); //subject: 形式比较任意，常用为 kevin@10.1.21.23:5060
+		void SetExpires(int expires);
+
+		/* 可选配置参数 */
+		void SetRoute(const std::string& route);        //route:  Bob:10.1.10.43:5060
+		void SetVia(const std::string& host, int port); //只配置via的host和端口
+		void SetContact(const std::string& contact);    //contact:  alice:10.1.10.23:5060
+		void AddHeaders(const std::string& key, const std::string& value);
+
+		/* 获取结果数据 */
+		const std::string& GetCallid() const; //获取事件中的callid
+		const int& GetSid() const;            //获取id
+
+		/* 限库内使用 */
+		SipSuscribeParams* GetData(); //外部调用无法使用
+
+	private:
+		SipSuscribeParams* m_pData;
 	};
 }
 

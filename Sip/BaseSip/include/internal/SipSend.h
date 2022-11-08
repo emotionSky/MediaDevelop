@@ -21,7 +21,7 @@ namespace sip
 			if (m_from.empty() || m_to.empty() || m_pwd.empty())
 				return false;
 
-			if (m_expires <= 0)
+			if (m_expires < 0)
 				return false;
 
 			return true;
@@ -51,6 +51,7 @@ namespace sip
 			m_expires = 0;
 			m_viaPort = 0;
 			m_cid = 0;
+			m_did = 0;
 		}
 
 		bool IsValid()
@@ -66,6 +67,7 @@ namespace sip
 
 		/* in */
 		bool m_bIsUacRefresh;
+		int m_did; //send ack
 		std::string m_from;
 		std::string m_to;
 		std::string m_route;
@@ -130,10 +132,74 @@ namespace sip
 		std::string m_route;
 		std::string m_contact;
 		std::string m_type;
+		std::string m_endcoding;
 		std::string m_content;
 		std::string m_viaHost;
 		int m_viaPort;
 		std::map<std::string, std::string> m_headers;
+	};
+
+	class SipCallMessageParams
+	{
+	public:
+		SipCallMessageParams()
+		{
+			m_did = 0;
+		}
+
+		bool IsValid()
+		{
+			if (m_did <= 0)
+				return false;
+
+			return true;
+		}
+
+		/* in */
+		int m_did;
+		std::string m_type;
+		std::string m_endcoding;
+		std::string m_content;
+
+		std::map<std::string, std::string> m_headers;
+	};
+
+	class SipSuscribeParams
+	{
+	public:
+		SipSuscribeParams()
+		{
+			m_viaPort = 0;
+			m_sid = 0;
+			m_expires = 0;
+		}
+
+		bool IsValid()
+		{
+			if (m_from.empty() || m_to.empty() || m_subject.empty() || m_event.empty())
+				return false;
+
+			if (m_expires < 0)
+				return false;
+
+			return true;
+		}
+
+		/* in */
+		std::string m_event;
+		std::string m_from;
+		std::string m_to;
+		std::string m_route;
+		std::string m_subject;
+		std::string m_contact;
+		std::string m_viaHost;
+		int m_viaPort;
+		int m_expires;
+		std::map<std::string, std::string> m_headers;
+
+		/* out */
+		std::string m_callid;
+		int m_sid;
 	};
 }
 
