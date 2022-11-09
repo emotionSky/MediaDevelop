@@ -7,7 +7,7 @@
 namespace sip
 {
 	class SipRegisterParams;
-	class ESipRegisterParams
+	class BASESIP_API ESipRegisterParams
 	{
 	public:
 		ESipRegisterParams();
@@ -35,7 +35,7 @@ namespace sip
 	};
 	
 	class SipCallParams;
-	class ESipCallParams
+	class BASESIP_API ESipCallParams
 	{
 	public:
 		ESipCallParams();
@@ -67,7 +67,7 @@ namespace sip
 	};
 
 	class SipCallResponseParams;
-	class ESipCallResponseParams
+	class BASESIP_API ESipCallResponseParams
 	{
 	public:
 		ESipCallResponseParams();
@@ -93,7 +93,7 @@ namespace sip
 	};
 
 	class SipMessageParams;
-	class ESipMessageParams
+	class BASESIP_API ESipMessageParams
 	{
 	public:
 		ESipMessageParams();
@@ -118,7 +118,7 @@ namespace sip
 	};
 
 	class SipCallMessageParams;
-	class ESipCallMessageParams
+	class BASESIP_API ESipCallMessageParams
 	{
 	public:
 		ESipCallMessageParams();
@@ -139,7 +139,7 @@ namespace sip
 	};
 
 	class SipSuscribeParams;
-	class ESipSuscribeParams
+	class BASESIP_API ESipSuscribeParams
 	{
 	public:
 		ESipSuscribeParams();
