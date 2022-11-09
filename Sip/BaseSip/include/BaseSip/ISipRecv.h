@@ -1,7 +1,7 @@
 #ifndef __I_SIP_RECV_H__
 #define __I_SIP_RECV_H__
 
-#include "SipDefine.h"
+#include "BaseSip/SipDefine.h"
 #include <string>
 
 namespace sip

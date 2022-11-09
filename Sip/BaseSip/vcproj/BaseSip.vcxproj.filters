@@ -14,34 +14,8 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="头文件\internal">
-      <UniqueIdentifier>{d231de0a-dfe7-4e18-a03c-71e0987a17d6}</UniqueIdentifier>
+      <UniqueIdentifier>{38264fb4-1eba-4ae2-ae67-2aab2d79aac1}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\include\BaseSip.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\internal\SipCommon.h">
-      <Filter>头文件\internal</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\internal\SipMessage.h">
-      <Filter>头文件\internal</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\internal\SipMessageHelper.h">
-      <Filter>头文件\internal</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\ISipRecv.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SipDefine.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\internal\SipSend.h">
-      <Filter>头文件\internal</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\ESipSend.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\BaseSip.cpp">
@@ -59,5 +33,31 @@
     <ClCompile Include="..\src\SipSend.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\BaseSip\BaseSip.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\ESipSend.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\ISipRecv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\SipDefine.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\internal\SipCommon.h">
+      <Filter>头文件\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\internal\SipMessage.h">
+      <Filter>头文件\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\internal\SipMessageHelper.h">
+      <Filter>头文件\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\BaseSip\internal\SipSend.h">
+      <Filter>头文件\internal</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

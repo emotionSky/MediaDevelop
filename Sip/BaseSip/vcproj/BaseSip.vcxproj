@@ -141,21 +141,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\BaseSip.h" />
-    <ClInclude Include="..\include\internal\SipCommon.h" />
-    <ClInclude Include="..\include\internal\SipMessage.h" />
-    <ClInclude Include="..\include\internal\SipMessageHelper.h" />
-    <ClInclude Include="..\include\internal\SipSend.h" />
-    <ClInclude Include="..\include\ISipRecv.h" />
-    <ClInclude Include="..\include\SipDefine.h" />
-    <ClInclude Include="..\include\ESipSend.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\BaseSip.cpp" />
     <ClCompile Include="..\src\SipCommon.cpp" />
     <ClCompile Include="..\src\SipMessage.cpp" />
     <ClCompile Include="..\src\SipMessageHelper.cpp" />
     <ClCompile Include="..\src\SipSend.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\BaseSip\BaseSip.h" />
+    <ClInclude Include="..\include\BaseSip\ESipSend.h" />
+    <ClInclude Include="..\include\BaseSip\internal\SipCommon.h" />
+    <ClInclude Include="..\include\BaseSip\internal\SipMessage.h" />
+    <ClInclude Include="..\include\BaseSip\internal\SipMessageHelper.h" />
+    <ClInclude Include="..\include\BaseSip\internal\SipSend.h" />
+    <ClInclude Include="..\include\BaseSip\ISipRecv.h" />
+    <ClInclude Include="..\include\BaseSip\SipDefine.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

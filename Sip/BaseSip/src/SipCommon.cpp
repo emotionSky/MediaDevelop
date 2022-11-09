@@ -1,6 +1,6 @@
 #include <cstring>
 #include <osipparser2/osip_port.h>
-#include "internal/SipCommon.h"
+#include "BaseSip/internal/SipCommon.h"
 
 SdpMediaMode ParseStringToSdpMediaMode(const char* str)
 {

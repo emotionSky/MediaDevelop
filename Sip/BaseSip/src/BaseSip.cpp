@@ -1,6 +1,6 @@
-#include "internal/SipMessage.h"
-#include "internal/SipMessageHelper.h"
-#include "internal/SipSend.h"
+#include "BaseSip/internal/SipMessage.h"
+#include "BaseSip/internal/SipMessageHelper.h"
+#include "BaseSip/internal/SipSend.h"
 #include <eXosip2/eXosip.h>
 
 #if defined(WIN32) || defined(WIN64)
@@ -15,7 +15,7 @@
 
 #include <thread>
 #include <Log/log_core.h>
-#include "BaseSip.h"
+#include "BaseSip/BaseSip.h"
 
 namespace sip
 {

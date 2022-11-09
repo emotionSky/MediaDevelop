@@ -1,7 +1,7 @@
 #ifndef __E_SIP_SEND_H__
 #define __E_SIP_SEND_H__
 
-#include "SipDefine.h"
+#include "BaseSip/SipDefine.h"
 #include <string>
 
 namespace sip

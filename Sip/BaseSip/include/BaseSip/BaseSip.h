@@ -1,8 +1,8 @@
 #ifndef __BASE_SIP_H__
 #define __BASE_SIP_H__
 
-#include "ISipRecv.h"
-#include "ESipSend.h"
+#include "BaseSip/ISipRecv.h"
+#include "BaseSip/ESipSend.h"
 #include <string>
 
 namespace sip
