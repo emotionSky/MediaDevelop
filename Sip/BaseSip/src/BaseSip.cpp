@@ -137,7 +137,7 @@ namespace sip
 			return true;
 		}
 
-		if (port <= 0 || port > 65535)
+		if (port <= 0 || port > 65535 || host == nullptr)
 			return false;
 
 		bool ret = false;
@@ -152,7 +152,7 @@ namespace sip
 				break;
 
 			/* 通讯协议及端口监听 */
-			if (eXosip_listen_addr(m_pData->m_pCtx, transport, host, port, family, secure) != OSIP_SUCCESS)
+			if (eXosip_listen_addr(m_pData->m_pCtx, transport, nullptr, port, family, secure) != OSIP_SUCCESS)
 			{
 				eXosip_quit(m_pData->m_pCtx);
 				break;
@@ -1144,6 +1144,8 @@ namespace sip
 
 			if (CompareStringCase(methed, "message") == 0)//MESSAGE
 				m_pCb->OnRecvMessage(info);
+			else if (CompareStringCase(methed, "register") == 0)//REGISTER
+				DealRegister(pEvt);
 		}
 		else
 		{
@@ -1166,6 +1168,54 @@ namespace sip
 		else
 		{
 			log_printf(LOG_WARN, "There is not a cb to deal.");
+		}
+	}
+
+	void BaseSip::DealRegister(void* pEvt)
+	{
+		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
+		osip_authorization_t* auth = nullptr;
+
+		osip_message_get_authorization(evt->request, 0, &auth);
+		if (auth && m_pCb)
+		{
+			SipMsgInfo info;
+
+#if 0
+			//需要针对可能出现空指针的情况进行处理！
+			const char* auth_uri = osip_authorization_get_uri(auth);
+			authInfo.auth_uri = auth_uri == nullptr ? "" : auth_uri;
+			const char* nonce = osip_authorization_get_nonce(auth);
+			authInfo.nonce = nonce == nullptr ? "" : nonce;
+			const char* realm = osip_authorization_get_realm(auth);
+			authInfo.realm = realm == nullptr ? "" : realm;
+			const char* response = osip_authorization_get_response(auth);
+			authInfo.response = response == nullptr ? "" : response;
+
+			authInfo.auth_type = "Digest";
+			authInfo.algorithm = "md5";
+			authInfo.stale = false;
+			authInfo.ha1 = "";//为常量空字符串
+			authInfo.method = "REGISTER";//常量字符串
+#endif
+			info.m_fromUser = GetFromUser(evt->request);
+			info.m_fromHost = GetFromHost(evt->request);
+			info.m_fromPort = GetFromPort(evt->request);
+
+			info.m_toUser = GetToUser(evt->request);
+			info.m_toHost = GetToHost(evt->request);
+			info.m_toPort = GetToPort(evt->request);
+			
+			info.m_callid = GetCallidNumber(evt->request);
+			info.m_tid = evt->tid;
+			info.m_expires = GetExpires(evt->request);
+
+			m_pCb->OnRecvRegister(info);
+		}
+		else
+		{
+			SipLock lock(m_pData->m_pCtx);
+			eXosip_message_send_answer(m_pData->m_pCtx, evt->tid, 401, nullptr);
 		}
 	}
 
