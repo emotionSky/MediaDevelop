@@ -1,10 +1,11 @@
 #ifndef __SIP_DEFINE_H__
+#define __SIP_DEFINE_H__
 
 #define PRINT_MACRO_HELPER(x)  #x
 #define PRINT_MACRO(x)         #x "=" PRINT_MACRO_HELPER(x)
 
 #if defined WIN32 || defined _WINDLL || defined __CYGWIN__
-	#if defined BASESIP_EXPORTS
+	#if defined DREAMSKY_EXPORTS
 		#if defined __GNUC__ || defined __clang__
 			#pragma message("log exports in gnuc-win.")
 			#define BASESIP_API           __attribute__ ((dllexport))
@@ -24,7 +25,7 @@
 		#endif
 	#endif
 #else
-	#if defined BASESIP_EXPORTS
+	#if defined DREAMSKY_EXPORTS
 		#if                                __GNUC__ >= 4 || defined __clang__
 			#pragma message("log exports in gnuc-unix.")
 			#define BASESIP_API           __attribute__((visibility ("default")))
