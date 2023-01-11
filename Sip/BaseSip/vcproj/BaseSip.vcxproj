@@ -144,16 +144,13 @@
     <ClCompile Include="..\src\BaseSip.cpp" />
     <ClCompile Include="..\src\BaseSipInfos.cpp" />
     <ClCompile Include="..\src\SipCommon.cpp" />
-    <ClCompile Include="..\src\SipSend.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\BaseSip\BaseSip.h" />
     <ClInclude Include="..\include\BaseSip\BaseSipInfos.h" />
-    <ClInclude Include="..\include\BaseSip\ESipSend.h" />
     <ClInclude Include="..\include\BaseSip\internal\SipCommon.h" />
     <ClInclude Include="..\include\BaseSip\internal\SipMessage.h" />
     <ClInclude Include="..\include\BaseSip\internal\SipMessageHelper.h" />
-    <ClInclude Include="..\include\BaseSip\internal\SipSend.h" />
     <ClInclude Include="..\include\BaseSip\ISipRecv.h" />
     <ClInclude Include="..\include\BaseSip\SipDefine.h" />
   </ItemGroup>

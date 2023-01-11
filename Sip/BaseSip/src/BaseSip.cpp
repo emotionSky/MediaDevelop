@@ -1,6 +1,5 @@
 #include "BaseSip/internal/SipMessage.h"
 #include "BaseSip/internal/SipMessageHelper.h"
-#include "BaseSip/internal/SipSend.h"
 #include <eXosip2/eXosip.h>
 
 #if defined(WIN32) || defined(WIN64)
@@ -879,30 +878,25 @@ namespace sip
 		return ret;
 	}
 
-	static void ParseSipMsgInfo(SipMsgInfo& info, osip_message_t* msg)
+	static inline void ParseSipMsgInfo(BaseSipInfos& p, osip_message_t* msg)
 	{
-		info.m_expires = GetExpires(msg);
-		info.m_fromUser = GetFromUser(msg);
-		info.m_fromHost = GetFromHost(msg);
-		info.m_fromPort = GetFromPort(msg);
-		info.m_toUser = GetFromUser(msg);
-		info.m_toHost = GetFromHost(msg);
-		info.m_toPort = GetFromPort(msg);
-		info.m_callid = GetCallidNumber(msg);
-		info.m_method = osip_message_get_method(msg);
+		p.SetInfosParams(SIP_INFO_FROM, GetFrom(msg));
+		p.SetInfosParams(SIP_INFO_TO, GetTo(msg));
+		p.SetInfosParams(SIP_INFO_EXPIRES, GetExpires(msg));
+		p.SetInfosParams(SIP_INFO_CALLID, GetCallidNumber(msg));
+		//char* method = osip_message_get_method(msg);
 	}
 
-	static void ParseEventInfo(SipMsgInfo& info, eXosip_event_t* evt)
+	static void ParseEventInfo(BaseSipInfos& p, eXosip_event_t* evt)
 	{
-		info.m_tid = evt->tid;
-		info.m_did = evt->did;
-		info.m_rid = evt->rid;
-		info.m_cid = evt->cid;
-		info.m_sid = evt->sid;
-		info.m_nid = evt->nid;
-		info.m_ssStatus = evt->ss_status;
-		info.m_ssReason = evt->ss_reason;
-		info.m_tid = evt->tid;
+		p.SetInfosParams(SIP_INFO_TID, std::to_string(evt->tid));
+		p.SetInfosParams(SIP_INFO_DID, std::to_string(evt->did));
+		p.SetInfosParams(SIP_INFO_RID, std::to_string(evt->rid));
+		p.SetInfosParams(SIP_INFO_CID, std::to_string(evt->cid));
+		p.SetInfosParams(SIP_INFO_SID, std::to_string(evt->sid));
+		p.SetInfosParams(SIP_INFO_NID, std::to_string(evt->nid));
+		p.SetInfosParams(SIP_INFO_SS_STATUS, std::to_string(evt->ss_status));
+		p.SetInfosParams(SIP_INFO_SS_REASON, std::to_string(evt->ss_reason));
 	}
 
 	void BaseSip::DealEvt(void* pEvt)
@@ -920,11 +914,11 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					info.m_statusCode = 200;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->response);
-					m_pCb->OnRecvRegisterResponse(info);
+					BaseSipInfos p;
+					p.SetInfosParams(SIP_INFO_STATUS_CODE, "200");
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->response);
+					m_pCb->OnRecvRegisterResponse(p);
 				}
 				else
 				{
@@ -937,11 +931,11 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					info.m_statusCode = -1; //GetStatusCode(evt->response)
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->response);
-					m_pCb->OnRecvRegisterResponse(info);
+					BaseSipInfos p;
+					p.SetInfosParams(SIP_INFO_STATUS_CODE, "-1"); //GetStatusCode(evt->response)
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->response);
+					m_pCb->OnRecvRegisterResponse(p);
 				}
 				else
 				{
@@ -956,10 +950,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{ 
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvInvite(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvInvite(p);
 				}
 				else
 				{
@@ -972,10 +966,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvReinvite(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvReinvite(p);
 				}
 				else
 				{
@@ -988,10 +982,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvReinvite(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvReinvite(p);
 				}
 				else
 				{
@@ -1008,10 +1002,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->response);
-					m_pCb->OnRecvInviteResponse(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->response);
+					m_pCb->OnRecvInviteResponse(p);
 				}
 				else
 				{
@@ -1030,10 +1024,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvAck(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvAck(p);
 				}
 				else
 				{
@@ -1046,10 +1040,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvCallCancel(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvCallCancel(p);
 				}
 				else
 				{
@@ -1085,10 +1079,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvBye(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvBye(p);
 				}
 				else
 				{
@@ -1103,10 +1097,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvCallRelease(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvCallRelease(p);
 				}
 				else
 				{
@@ -1153,10 +1147,10 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->response);
-					m_pCb->OnRecvSubscribeResponse(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->response);
+					m_pCb->OnRecvSubscribeResponse(p);
 				}
 				else
 				{
@@ -1172,12 +1166,18 @@ namespace sip
 			case EXOSIP_SUBSCRIPTION_SERVERFAILURE:	 //服务失败   announce a server failure 
 			case EXOSIP_SUBSCRIPTION_GLOBALFAILURE:	 //全局失败   announce a global failure
 			{
-				SipMsgInfo info;
-				ParseEventInfo(info, evt);
-				ParseSipMsgInfo(info, evt->response);
-
 				if (m_pCb)
-					m_pCb->OnRecvSubscribeResponse(info);
+				{
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->response);
+					m_pCb->OnRecvSubscribeResponse(p);
+				}
+				else
+				{
+					log_printf(LOG_WARN, "There is not a cb to deal.");
+				}
+					
 				break;
 			}
 
@@ -1185,28 +1185,34 @@ namespace sip
 			{
 				if (m_pCb)
 				{
-					SipMsgInfo info;
-					ParseEventInfo(info, evt);
-					ParseSipMsgInfo(info, evt->request);
-					m_pCb->OnRecvNotify(info);
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvNotify(p);
 				}
 				else
 				{
-					eXosip_lock(m_pData->m_pCtx);
+					SipLock lock(m_pData->m_pCtx);
 					eXosip_message_send_answer(m_pData->m_pCtx, evt->tid, 200, nullptr);
-					eXosip_unlock(m_pData->m_pCtx);
 				}
 				break;
 			}
 
 			case EXOSIP_IN_SUBSCRIPTION_NEW://收到SUBSCRIBE/REFER的请求   announce new incoming SUBSCRIBE/REFER
 			{
-				SipMsgInfo info;
-				ParseEventInfo(info, evt);
-				ParseSipMsgInfo(info, evt->request);
-
 				if (m_pCb)
-					m_pCb->OnRecvSubscribe(info);
+				{
+					BaseSipInfos p;
+					ParseEventInfo(p, evt);
+					ParseSipMsgInfo(p, evt->request);
+					m_pCb->OnRecvSubscribe(p);
+				}
+				else
+				{
+					SipLock lock(m_pData->m_pCtx);
+					eXosip_message_send_answer(m_pData->m_pCtx, evt->tid, 401, nullptr);
+				}
+					
 				break;
 			}
 
@@ -1230,12 +1236,12 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->request);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->request);
 
 			if (CompareStringCase(methed, "message") == 0)//MESSAGE
-				m_pCb->OnRecvMessage(info);
+				m_pCb->OnRecvMessage(p);
 			else if (CompareStringCase(methed, "register") == 0)//REGISTER
 				DealRegister(pEvt);
 		}
@@ -1250,12 +1256,12 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->response);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->response);
 
 			if (CompareStringCase(method, "message") == 0)//MESSAGE
-				m_pCb->OnRecvMessageResponse(info);
+				m_pCb->OnRecvMessageResponse(p);
 		}
 		else
 		{
@@ -1271,7 +1277,7 @@ namespace sip
 		osip_message_get_authorization(evt->request, 0, &auth);
 		if (auth && m_pCb)
 		{
-			SipMsgInfo info;
+			BaseSipInfos p;
 
 #if 0
 			//需要针对可能出现空指针的情况进行处理！
@@ -1290,19 +1296,10 @@ namespace sip
 			authInfo.ha1 = "";//为常量空字符串
 			authInfo.method = "REGISTER";//常量字符串
 #endif
-			info.m_fromUser = GetFromUser(evt->request);
-			info.m_fromHost = GetFromHost(evt->request);
-			info.m_fromPort = GetFromPort(evt->request);
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->request);
 
-			info.m_toUser = GetToUser(evt->request);
-			info.m_toHost = GetToHost(evt->request);
-			info.m_toPort = GetToPort(evt->request);
-			
-			info.m_callid = GetCallidNumber(evt->request);
-			info.m_tid = evt->tid;
-			info.m_expires = GetExpires(evt->request);
-
-			m_pCb->OnRecvRegister(info);
+			m_pCb->OnRecvRegister(p);
 		}
 		else
 		{
@@ -1316,12 +1313,12 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->request);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->request);
 
 			if (CompareStringCase(method, "message") == 0)//MESSAGE
-				m_pCb->OnRecvCallMessage(info);
+				m_pCb->OnRecvCallMessage(p);
 		}
 		else
 		{
@@ -1335,12 +1332,12 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->response);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->response);
 
 			if (CompareStringCase(method, "message") == 0)//MESSAGE
-				m_pCb->OnRecvCallMessageResponse(info);
+				m_pCb->OnRecvCallMessageResponse(p);
 		}		
 		else
 		{
@@ -1354,14 +1351,14 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->request);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->request);
 
 			if (CompareStringCase(method, "subscribe") == 0)//SUBSCRIBE
-				m_pCb->OnRecvSubScribeTimeout(info);
+				m_pCb->OnRecvSubScribeTimeout(p);
 			else if(CompareStringCase(method, "notify") == 0)//NOTIFY
-				m_pCb->OnRecvNotifyTimeout(info);
+				m_pCb->OnRecvNotifyTimeout(p);
 		}
 		else
 		{
@@ -1375,13 +1372,13 @@ namespace sip
 		eXosip_event_t* evt = static_cast<eXosip_event_t*>(pEvt);
 		if (m_pCb)
 		{
-			SipMsgInfo info;
-			ParseEventInfo(info, evt);
-			ParseSipMsgInfo(info, evt->request);
+			BaseSipInfos p;
+			ParseEventInfo(p, evt);
+			ParseSipMsgInfo(p, evt->request);
 			if (CompareStringCase(method, "subscribe") == 0)//SUBSCRIBE
-				m_pCb->OnRecvSubscribeResponse(info);
+				m_pCb->OnRecvSubscribeResponse(p);
 			else if (CompareStringCase(method, "notify") == 0)//NOTIFY
-				m_pCb->OnRecvNotifyResponse(info);
+				m_pCb->OnRecvNotifyResponse(p);
 		}
 		else
 		{

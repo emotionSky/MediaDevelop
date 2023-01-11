@@ -2,7 +2,6 @@
 #define __BASE_SIP_H__
 
 #include "BaseSip/ISipRecv.h"
-#include "BaseSip/ESipSend.h"
 #include "BaseSip/BaseSipInfos.h"
 #include <string>
 

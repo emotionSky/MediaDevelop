@@ -6,7 +6,7 @@
 #include <osipparser2/osip_parser.h>
 #include <cstring>
 #include <cstdlib>
-#include <malloc.h>
+#include <string>
 #include "SipCommon.h"
 
 namespace sip
@@ -92,17 +92,6 @@ namespace sip
 		return nullptr;
 	}
 
-	static inline const char* GetFromUser(const osip_message_t* msg)
-	{
-		osip_from_t* from = osip_message_get_from(msg);
-		osip_uri_t* uri = osip_from_get_url(from);
-		if (uri && from)
-		{
-			return uri->username;
-		}
-		return nullptr;
-	}
-
 	static inline const char* GetFromPassword(const osip_message_t* msg)
 	{
 		osip_from_t* from = osip_message_get_from(msg);
@@ -114,30 +103,36 @@ namespace sip
 		return nullptr;
 	}
 
-	static inline const char* GetFromHost(const osip_message_t* msg)
+	/*
+	 * @brief 获取 from 
+	 * @param[in] msg  sip消息结构体
+	 * @return from，形如 alice@12.1.12.3:5060
+	 */
+	static inline std::string GetFrom(const osip_message_t* msg)
 	{
+		std::string res;
 		osip_from_t* from = osip_message_get_from(msg);
 		osip_uri_t* uri = osip_from_get_url(from);
-		if (uri && from)
+		if (from && uri)
 		{
-			return uri->host;
+			if (uri->username)
+			{
+				res += uri->username;
+				res += "@";
+			}
+			if (uri->host)
+			{
+				res += uri->host;
+				res += ":";
+			}
+			if (uri->port)
+			{
+				res += uri->port;
+			}
 		}
-
-		return nullptr;
+		return res;
 	}
-
-	static inline int GetFromPort(const osip_message_t* msg)
-	{
-		osip_from_t* from = osip_message_get_from(msg);
-		osip_uri_t* uri = osip_from_get_url(from);
-		if (uri && from)
-		{
-			return atoi(uri->port);
-		}
-
-		return 0;
-	}
-
+	
 	static inline const char* GetFromTag(const osip_message_t* msg)
 	{
 		osip_from_t* from = osip_message_get_from(msg);
@@ -153,15 +148,34 @@ namespace sip
 		return nullptr;
 	}
 
-	static inline const char* GetToUser(const osip_message_t* msg)
+	/*
+	 * @brief 获取 to
+	 * @param[in] msg  sip消息结构体
+	 * @return to，形如 alice@12.1.12.3:5060
+	 */
+	static inline std::string GetTo(const osip_message_t* msg)
 	{
+		std::string res;
 		osip_from_t* to = osip_message_get_to(msg);
 		osip_uri_t* uri = osip_from_get_url(to);
-		if (uri && to)
+		if (to && uri)
 		{
-			return uri->username;
+			if (uri->username)
+			{
+				res += uri->username;
+				res += "@";
+			}
+			if (uri->host)
+			{
+				res += uri->host;
+				res += ":";
+			}
+			if (uri->port)
+			{
+				res += uri->port;
+			}
 		}
-		return nullptr;
+		return res;
 	}
 
 	static inline const char* GetToPassword(const osip_message_t* msg)
@@ -173,30 +187,6 @@ namespace sip
 			return uri->password;
 		}
 		return nullptr;
-	}
-
-	static inline const char* GetToHost(const osip_message_t* msg)
-	{
-		osip_from_t* to = osip_message_get_to(msg);
-		osip_uri_t* uri = osip_from_get_url(to);
-		if (uri && to)
-		{
-			return uri->host;
-		}
-
-		return nullptr;
-	}
-
-	static inline int GetToPort(const osip_message_t* msg)
-	{
-		osip_from_t* to = osip_message_get_to(msg);
-		osip_uri_t* uri = osip_from_get_url(to);
-		if (uri && to)
-		{
-			return osip_atoi(uri->port);
-		}
-
-		return 0;
 	}
 
 	static inline const char* GetToTag(const osip_message_t* msg)
@@ -258,15 +248,15 @@ namespace sip
 		osip_message_get_status_code(msg);
 	}
 
-	static inline int GetExpires(const osip_message_t* msg)
+	static inline const char* GetExpires(const osip_message_t* msg)
 	{
 		osip_header_t* expires = nullptr;
 		osip_message_get_expires(msg, 0, &expires);
 		if (expires)
 		{
-			return osip_atoi(expires->hvalue);
+			return expires->hvalue;
 		}
-		return 0;
+		return "";
 	}
 	
 	static inline int GetSessionExpires(const osip_message_t* msg, char* refresher)

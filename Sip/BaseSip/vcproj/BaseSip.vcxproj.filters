@@ -24,18 +24,12 @@
     <ClCompile Include="..\src\SipCommon.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\SipSend.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\BaseSipInfos.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\BaseSip\BaseSip.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\BaseSip\ESipSend.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\include\BaseSip\ISipRecv.h">
@@ -51,9 +45,6 @@
       <Filter>头文件\internal</Filter>
     </ClInclude>
     <ClInclude Include="..\include\BaseSip\internal\SipMessageHelper.h">
-      <Filter>头文件\internal</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\BaseSip\internal\SipSend.h">
       <Filter>头文件\internal</Filter>
     </ClInclude>
     <ClInclude Include="..\include\BaseSip\BaseSipInfos.h">
