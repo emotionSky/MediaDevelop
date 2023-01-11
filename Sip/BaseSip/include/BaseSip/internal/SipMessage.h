@@ -11,11 +11,6 @@
 
 namespace sip
 {
-	/**************************************** Memory operation ****************************************/
-	void* SipMalloc(int len);
-	void SipFree(void* buf);
-
-
 	/**************************************** Get message info ****************************************/
 
 	/*
@@ -288,31 +283,51 @@ namespace sip
 
 	/**************************************** Set message info ****************************************/
 
-	static inline bool SetContentType(osip_message_t* msg, const char* ctype)
+	/*
+	 * @brief 设置消息中的content type
+	 * @param[in] msg    sip消息结构体
+	 * @param[in] ctype  content_type，一般形如 application/xml
+	 * @return void
+	 */
+	static inline void SetContentType(osip_message_t* msg, const char* ctype)
 	{
-		if (msg && ctype)
-			return osip_message_set_content_type(msg, ctype) == OSIP_SUCCESS;
-
-		return false;
+		if (!msg || !ctype || ctype[0] == '\0')
+			return;
+		osip_message_set_content_type(msg, ctype);
 	}
 
+	/*
+	 * @brief 设置消息中的encoding
+	 * @param[in] msg       sip消息结构体
+	 * @param[in] encoding  encoding，一般形如 zip
+	 * @return void
+	 */
 	static inline void SetContentEncoding(osip_message_t* msg, const char* encoding)
 	{
+		if (!msg || !encoding || encoding[0] == '\0')
+			return;
+
 		osip_message_set_content_encoding(msg, encoding);
 	}
 
+	/*
+	 * @brief 设置消息中的content
+	 * @param[in] msg      sip消息结构体
+	 * @param[in] content  消息体
+	 * @param[in] len      消息体的长度
+	 * @return void
+	 */
 	static inline void SetContent(osip_message_t* msg, const char* content, size_t len)
 	{
-		if (!content || len == 0)
+		if (!msg || !content || content[0] == '\0' || len == 0)
 			return;
 
 		osip_body_t* body = nullptr;
 		osip_message_get_body(msg, 0, &body);
 		if (body)
 		{
-			if (body->body)
-				SipFree(body->body);
-
+			osip_free(body->body);
+			body->body = nullptr;
 			osip_body_parse(body, content, len);
 		}
 		else
@@ -320,166 +335,127 @@ namespace sip
 			osip_message_set_body(msg, content, len);
 		}
 	}
+
+	/*
+	 * @brief 设置消息中的from字段
+	 * @param[in] msg   sip消息结构体
+	 * @param[in] from  from的用户名、IP和端口，形如 alice@12.1.12.3:5060
+	 * @return void
+	 */
+	static inline void SetFrom(osip_message_t* msg, const char* from)
+	{
+		if (!msg || !from || from[0] == '\0')
+			return;
+
+		osip_contact_t* sip_from = osip_message_get_from(msg);
+		osip_uri_t* uri = osip_from_get_url(sip_from);
+		if (sip_from && uri)
+		{
+			char user[64], host[32], port[16];
+			if (sscanf(from, "%[^@]@%[^:]:%s", user, host, port) == 3)
+			{
+				osip_free(uri->username);
+				uri->username = osip_strdup(user);
+				osip_free(uri->host);
+				uri->host = osip_strdup(host);
+				osip_free(uri->port);
+				uri->port = osip_strdup(port);
+			}
+		}
+	}
+		
+	/*
+	 * @brief 设置消息中的to字段
+	 * @param[in] msg   sip消息结构体
+	 * @param[in] to    to的用户名、IP和端口，形如 alice@12.1.12.3:5060
+	 * @return void
+	 */
+	static inline void SetTo(osip_message_t* msg, const char* to)
+	{
+		if (!msg || !to || to[0] == '\0')
+			return;
+
+		osip_contact_t* sip_to = osip_message_get_to(msg);
+		osip_uri_t* uri = osip_from_get_url(sip_to);
+		if (sip_to && uri)
+		{
+			char user[64], host[32], port[16];
+			if (sscanf(to, "%[^@]@%[^:]:%s", user, host, port) == 3)
+			{
+				osip_free(uri->username);
+				uri->username = osip_strdup(user);
+				osip_free(uri->host);
+				uri->host = osip_strdup(host);
+				osip_free(uri->port);
+				uri->port = osip_strdup(port);
+			}
+		}
+	}
 	
-	static inline void SetFromUser(osip_message_t* msg, const char* user)
-	{
-		osip_from_t* from_url = osip_message_get_from(msg);
-		osip_uri_t* uri = osip_from_get_url(from_url);
-		if (from_url && uri)
-		{
-			osip_uri_set_username(uri, osip_strdup(user));
-		}
-	}
-
-	static inline void SetFromHost(osip_message_t* msg, const char* host)
-	{
-		osip_from_t* from_url = osip_message_get_from(msg);
-		osip_uri_t* uri = osip_from_get_url(from_url);
-		if (from_url && uri)
-		{
-			osip_uri_set_host(uri, osip_strdup(host));
-		}
-	}
-
-	static inline void SetFromPort(osip_message_t* msg, int port)
-	{
-		osip_from_t* from_url = osip_message_get_from(msg);
-		osip_uri_t* uri = osip_from_get_url(from_url);
-		if (from_url && uri)
-		{
-			char p[10] = { 0 };
-			sprintf(p, "%d", port);
-			osip_uri_set_host(uri, osip_strdup(p));
-		}
-	}
-
-	static inline void SetToUser(osip_message_t* msg, const char* user)
-	{
-		osip_from_t* to_url = osip_message_get_to(msg);
-		osip_uri_t* uri = osip_from_get_url(to_url);
-		if (to_url && uri)
-		{
-			osip_uri_set_username(uri, osip_strdup(user));
-		}
-	}
-
-	static inline void SetToHost(osip_message_t* msg, const char* host)
-	{
-		osip_from_t* to_url = osip_message_get_to(msg);
-		osip_uri_t* uri = osip_from_get_url(to_url);
-		if (to_url && uri)
-		{
-			osip_uri_set_host(uri, osip_strdup(host));
-		}
-	}
-
-	static inline void SetToPort(osip_message_t* msg, int port)
-	{
-		osip_from_t* to_url = osip_message_get_to(msg);
-		osip_uri_t* uri = osip_from_get_url(to_url);
-		if (to_url && uri)
-		{
-			char p[10] = { 0 };
-			sprintf(p, "%d", port);
-			osip_uri_set_host(uri, osip_strdup(p));
-		}
-	}
-
+	/*
+	 * @brief 设置消息中的via字段
+	 * @param[in] msg  sip消息结构体
+	 * @param[in] via  via的IP和端口，形如 12.1.12.3:5060
+	 * @return void
+	 */
 	static inline void SetVia(osip_message_t* msg, const char* via)
 	{
-		osip_via_t* sip_via = NULL;
+		if (!msg || !via || via[0] == '\0')
+			return;
+
+		osip_via_t* sip_via = nullptr;
 		osip_message_get_via(msg, 0, &sip_via);
 		if (sip_via)
 		{
-			osip_via_parse(sip_via, via);
-		}
-	}
-
-	static inline void SetViaHost(osip_message_t* msg, const char* host)
-	{
-		osip_via_t* via = NULL;
-		osip_message_get_via(msg, 0, &via);
-		if (via)
-		{
-			osip_via_set_host(via, osip_strdup(host));
-		}
-	}
-
-	static inline void SetViaPort(osip_message_t* msg, int port)
-	{
-		osip_via_t* via = NULL;
-		osip_message_get_via(msg, 0, &via);
-		if (via)
-		{
-			char p[10] = { 0 };
-			sprintf(p, "%d", port);
-			osip_via_set_port(via, osip_strdup(p));
-		}
-	}
-
-	static inline void SetContact(osip_message_t* msg, const char* str)
-	{
-		if (str)
-		{
-			char user[64], host[32], port[16];
-			int ret = sscanf(str, "%[^@]@%[^:]:%s", user, host, port);
-			if (ret == 3)
+			char host[64], port[16];
+			if (sscanf(via, "%s:%s", host, port) == 2)
 			{
-				osip_contact_t* contact = NULL;
-				osip_message_get_contact(msg, 0, &contact);
-				osip_uri_t* uri = osip_contact_get_url(contact);
-				if (contact && uri)
-				{
-					osip_uri_set_username(uri, osip_strdup(user));
-					osip_uri_set_host(uri, osip_strdup(host));
-					osip_uri_set_host(uri, osip_strdup(port));
-				}
+				osip_free(sip_via->host);
+				sip_via->host = osip_strdup(host);
+				osip_free(sip_via->port);
+				sip_via->port = osip_strdup(port);
 			}
 		}
 	}
 
-	static inline void SetContactUser(osip_message_t* msg, const char* user)
+	/*
+	 * @brief 设置消息中的contact字段
+	 * @param[in] msg      sip消息结构体
+	 * @param[in] contact  contact的用户名、IP和端口，形如 alice@12.1.12.3:5060
+	 * @return void
+	 */
+	static inline void SetContact(osip_message_t* msg, const char* contact)
 	{
-		osip_contact_t* contact = NULL;
-		osip_message_get_contact(msg, 0, &contact);
-		osip_uri_t* uri = osip_contact_get_url(contact);
-		if (contact && uri)
-		{
-			osip_uri_set_username(uri, osip_strdup(user));
-		}
-	}
+		if (!msg || !contact || contact[0] == '\0')
+			return;
 
-	static inline void SetContactHost(osip_message_t* msg, const char* host)
-	{
-		osip_contact_t* contact = NULL;
-		osip_message_get_contact(msg, 0, &contact);
-		osip_uri_t* uri = osip_contact_get_url(contact);
-		if (contact && uri)
+		osip_contact_t* sip_contact = nullptr;
+		osip_message_get_contact(msg, 0, &sip_contact);
+		osip_uri_t* uri = osip_contact_get_url(sip_contact);
+		if (sip_contact && uri)
 		{
-			osip_uri_set_host(uri, osip_strdup(host));
-		}
-	}
-
-	static inline void SetContactPort(osip_message_t* msg, int port)
-	{
-		osip_contact_t* contact = NULL;
-		osip_message_get_contact(msg, 0, &contact);
-		osip_uri_t* uri = osip_contact_get_url(contact);
-		if (contact && uri)
-		{
-			char p[10] = { 0 };
-			sprintf(p, "%d", port);
-			osip_uri_set_host(uri, osip_strdup(p));
+			char user[64], host[32], port[16];
+			if (sscanf(contact, "%[^@]@%[^:]:%s", user, host, port) == 3)
+			{
+				osip_free(uri->username);
+				uri->username = osip_strdup(user);
+				osip_free(uri->host);
+				uri->host = osip_strdup(host);
+				osip_free(uri->port);
+				uri->port = osip_strdup(port);
+			}
 		}
 	}
 
 	/*
 	 * @brief 设置 subject 
-	 * @param[in] subject 形如 <sip:alice@10.1.1.21:1234>
+	 * @param[in] subject 多数情况下形如 <sip:alice@10.1.1.21:1234>
 	 * @return void
 	 */
 	static inline void SetSubject(osip_message_t* msg, const char* subject)
 	{
+		if (!msg || !subject || subject[0] == '\0')
+			return;
 		osip_message_set_subject(msg, subject);
 	}
 
@@ -507,71 +483,40 @@ namespace sip
 	/*
 	 * @brief 设置会话的 expires
 	 * @param[in] msg         sip消息结构体
-	 * @param[in] session_exp expires的内容，形如 60;refresher=uas    60;refresher=uac
+	 * @param[in] refresher   refresher的内容，形如 uac uas
+	 * @param[in] expire      呼叫的截止时间
+	 * @return void
 	 */
-	static inline void SetSessionExpires(osip_message_t* msg, bool isUac, int expire)
+	static inline void SetSessionExpires(osip_message_t* msg, const char* refresher, int expire)
 	{
 		char session_exp[32] = { 0 };
-		sprintf(session_exp, "%d;refresher=%s", expire, isUac ? "uac" : "uas");
+		sprintf(session_exp, "%d;refresher=%s", expire, refresher);
 		osip_message_set_header(msg, "Session-Expires", session_exp);
 	}
 
+	/*
+	 * @brief 设置route的uri
+	 * @param[in] msg   sip消息结构体
+	 * @param[in] uri   修改后的uri，形如 bob@12.1.12.3:5060
+	 * @return void
+	 */
 	static inline void SetRequestUri(osip_message_t* msg, const char* uri)
 	{
+		if (!msg || !uri || uri[0] == '\0')
+			return;
+
 		char user[64], host[32], port[16];
-		int ret = sscanf(uri, "%[^@]@%[^:]:%s", user, host, port);
-		if (ret == 3)
+		if (sscanf(uri, "%[^@]@%[^:]:%s", user, host, port) == 3)
 		{
-			char* p = nullptr;
-			p = osip_uri_get_username(msg->req_uri);
-			if (p)
-				SipFree(p);
-			osip_uri_set_username(msg->req_uri, osip_strdup(user));
-
-			p = osip_uri_get_host(msg->req_uri);
-			if (p)
-				SipFree(p);
-			osip_uri_set_host(msg->req_uri, osip_strdup(host));
-
-			p = osip_uri_get_port(msg->req_uri);
-			if (p)
-				SipFree(p);
-			osip_uri_set_host(msg->req_uri, osip_strdup(port));
+			osip_free(msg->req_uri->username);
+			msg->req_uri->username = osip_strdup(user);
+			osip_free(msg->req_uri->host);
+			msg->req_uri->host = osip_strdup(host);
+			osip_free(msg->req_uri->host);
+			msg->req_uri->host = osip_strdup(host);
 		}
 	}
 	
-	static inline void SetRequestUriUser(osip_message_t* msg, const char* user)
-	{
-		char* oldNum = osip_uri_get_username(msg->req_uri);
-		if (oldNum)
-		{
-			SipFree(oldNum);
-		}
-		osip_uri_set_username(msg->req_uri, osip_strdup(user));
-	}
-
-	static inline void SetRequestUriHost(osip_message_t* msg, const char* host)
-	{
-		char* oldHost = osip_uri_get_host(msg->req_uri);
-		if (oldHost)
-		{
-			SipFree(oldHost);
-		}
-		osip_uri_set_host(msg->req_uri, osip_strdup(host));
-	}
-
-	static inline void SetRequestUriPort(osip_message_t* msg, int port)
-	{
-		char* oldPort = osip_uri_get_port(msg->req_uri);
-		if (oldPort)
-		{
-			SipFree(oldPort);
-		}
-		char buf[16];
-		sprintf(buf, "%d", port);
-		osip_uri_set_host(msg->req_uri, osip_strdup(buf));
-	}
-
 	/**************************************** Get sdp info ****************************************/
 
 	static inline int GetSdpAttrIndex(sdp_message_t* sdp, int media_pos, const char* attrName)
@@ -802,7 +747,7 @@ namespace sip
 			sdp_bandwidth_t* bw = sdp_message_bandwidth_get(sdp, media_pos, 0);
 			if (bw)
 			{
-				SipFree(bw->b_bandwidth);
+				osip_free(bw->b_bandwidth);
 				bw->b_bandwidth = osip_strdup(buf);
 			}
 			else
@@ -833,7 +778,7 @@ namespace sip
 			sdp_bandwidth_t* bw = sdp_message_bandwidth_get(sdp, media_pos, 0);
 			if (bw)
 			{
-				SipFree(bw->b_bandwidth);
+				osip_free(bw->b_bandwidth);
 				bw->b_bandwidth = osip_strdup(buf);
 			}
 			else

@@ -22,13 +22,12 @@ namespace sip
 	class BaseData
 	{
 	public:
-		BaseData() : m_bRunning(false), m_localPort(0), m_pThread(nullptr), m_pCtx(nullptr) 
+		BaseData() : m_bRunning(false), m_pThread(nullptr), m_pCtx(nullptr) 
 		{
-			m_localHost = "127.0.0.0";
+			m_localAddr = "127.0.0.0:0";
 		}
 		bool             m_bRunning;
-		int              m_localPort;
-		std::string      m_localHost;
+		std::string      m_localAddr;
 		std::thread*     m_pThread;
 		struct eXosip_t* m_pCtx;
 	};
@@ -124,12 +123,12 @@ namespace sip
 		}		
 	}
 
-	bool BaseSip::Init(const char* host, int port, const char* agent, ISipRecv* pCb)
+	bool BaseSip::Init(const char* host, int port, const char* agent, ISipRecv* pCb, bool bIsOnlyHost)
 	{
-		return Init(host, port, agent, AF_INET, true, false, pCb);
+		return Init(host, port, agent, AF_INET, true, false, pCb, bIsOnlyHost);
 	}
 
-	bool BaseSip::Init(const char* host, int port, const char* agent, int family, bool bIsUdp, bool bIsSecure, ISipRecv* pCb)
+	bool BaseSip::Init(const char* host, int port, const char* agent, int family, bool bIsUdp, bool bIsSecure, ISipRecv* pCb, bool bIsOnlyHost)
 	{
 		if (m_pData->m_pCtx != nullptr)
 		{
@@ -137,7 +136,7 @@ namespace sip
 			return true;
 		}
 
-		if (port <= 0 || port > 65535 || host == nullptr)
+		if (port <= 0 || port > 65535 || host == nullptr || host[0] == '\0')
 			return false;
 
 		bool ret = false;
@@ -152,7 +151,7 @@ namespace sip
 				break;
 
 			/* 通讯协议及端口监听 */
-			if (eXosip_listen_addr(m_pData->m_pCtx, transport, nullptr, port, family, secure) != OSIP_SUCCESS)
+			if (eXosip_listen_addr(m_pData->m_pCtx, transport, (bIsOnlyHost ? host : nullptr), port, family, secure) != OSIP_SUCCESS)
 			{
 				eXosip_quit(m_pData->m_pCtx);
 				break;
@@ -163,9 +162,7 @@ namespace sip
 			if(agent)
 				eXosip_set_user_agent(m_pData->m_pCtx, agent);
 
-			if (host)
-				m_pData->m_localHost = host;
-			m_pData->m_localPort = port;
+			m_pData->m_localAddr = std::string(host) + ":" + std::to_string(port);
 			m_pCb = pCb;
 			ret = true;
 			break;
@@ -173,7 +170,7 @@ namespace sip
 
 		if (!ret)
 		{
-			SipFree(m_pData->m_pCtx);
+			osip_free(m_pData->m_pCtx);
 			m_pData->m_pCtx = nullptr;
 		}
 
@@ -255,536 +252,631 @@ namespace sip
 		}
 	}
 
-	int BaseSip::SendRegister(ESipRegisterParams& params)
+	int BaseSip::SendRegister(BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipRegisterParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& pwd = p.GetInfosParams(SIP_INFO_REGISTER_PWD, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
 
+		if (from.empty() || route.empty() || pwd.empty())
+			return OSIP_BADPARAMETER;
+
+		auto& contact = p.GetInfosParams(SIP_INFO_CONTACT, "");
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
 		osip_message_t* reg = nullptr;
-		std::string user = GetUserInString(p->m_from.c_str());
-		std::string from = std::string("sip:") + p->m_from;
-		std::string proxy = std::string("sip:") + p->m_to;
-		std::string contact = p->m_contact.empty() ? "" : std::string("sip:") + p->m_contact;
+		std::string user = GetUserInString(from.c_str());
+		int expires = std::stoi(p.GetInfosParams(SIP_INFO_EXPIRES, "0"));
+		auto sip_from = std::string("sip:") + from;
+		auto sip_route = std::string("sip:") + route;
+
+		std::string contact_str;
+		const char* sip_contact = nullptr;
+		if (!contact.empty())
+		{
+			contact_str = std::string("sip:") + contact;
+			sip_contact = contact_str.c_str();
+		}		
 
 		SipLock lock(m_pData->m_pCtx);
 		/* 可能存在注册失败，然后添加代理处进行了密码的修改，这里就需要先删除原有的认证信息，然后替换修改后的认证信息 */
 		eXosip_remove_authentication_info(m_pData->m_pCtx, user.c_str(), nullptr);
-		eXosip_add_authentication_info(m_pData->m_pCtx, user.c_str(), user.c_str(), p->m_pwd.c_str(), "MD5", nullptr);
+		eXosip_add_authentication_info(m_pData->m_pCtx, user.c_str(), user.c_str(), pwd.c_str(), "MD5", nullptr);
 		int rid = eXosip_register_build_initial_register(m_pData->m_pCtx,
-			from.c_str(),
-			proxy.c_str(),
-			contact.c_str(),
-			p->m_expires,
+			sip_from.c_str(),
+			route.c_str(),
+			sip_contact,
+			expires,
 			&reg);
 
 		if (rid > 0)
 		{
-			if (!p->m_viaHost.empty())
-				SetViaHost(reg, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(reg, p->m_viaPort);
-			
+			SetVia(reg, sip_via.c_str());
 			int ret = eXosip_register_send_register(m_pData->m_pCtx, rid, reg);
 
 			if (ret == OSIP_SUCCESS)
 			{
-				p->m_callid = GetCallidNumber(reg);
-				p->m_rid = rid;
-				return SIP_SUCCESS;
+				p.SetInfosParams(SIP_INFO_CALLID, GetCallidNumber(reg));
+				p.SetInfosParams(SIP_INFO_RID, std::to_string(rid));
+				return OSIP_SUCCESS;
 			}
 		}
 
-		return SIP_ERROR;
+		return OSIP_UNDEFINED_ERROR;
 	}
 
 	int BaseSip::RefreshRegister(int rid, int expires)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
 		osip_message_t* reg = nullptr;
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_register_build_register(m_pData->m_pCtx, rid, expires, &reg);
-		if (reg)
-			eXosip_register_send_register(m_pData->m_pCtx, rid, reg);
+		int ret = eXosip_register_build_register(m_pData->m_pCtx, rid, expires, &reg);
+		if (ret == OSIP_SUCCESS)
+		{
+			return eXosip_register_send_register(m_pData->m_pCtx, rid, reg);
+		}
 
-		return SIP_SUCCESS;
+		return ret;
 	}
 
 	int BaseSip::UpdateRegisterPwd(const char* user, const char* newPwd)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
 		SipLock lock(m_pData->m_pCtx);
 		eXosip_remove_authentication_info(m_pData->m_pCtx, user, nullptr);
 		eXosip_add_authentication_info(m_pData->m_pCtx, user, user, newPwd, "MD5", nullptr);
 
-		return SIP_SUCCESS;
+		return OSIP_SUCCESS;
 	}
 
 	int BaseSip::SendRegisterResponse(int tid, int statusCode)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_message_send_answer(m_pData->m_pCtx, tid, statusCode, nullptr);
-
-		return SIP_SUCCESS;
+		return eXosip_message_send_answer(m_pData->m_pCtx, tid, statusCode, nullptr);
 	}
 
-	int BaseSip::SendOptions(ESipMessageParams& params)
+	int BaseSip::SendOptions(BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+		
+		if (from.empty() || to.empty())
+			return OSIP_BADPARAMETER;
 
-		std::string from = std::string("sip:") + p->m_from;
-		std::string to = std::string("sip:") + p->m_to;
-		std::string route = p->m_route.empty() ? "" : std::string("sip:") + p->m_route;
+		std::string sip_from = std::string("sip:") + from;
+		std::string sip_to = std::string("sip:") + to;
+		std::string sip_route = std::string("sip:") + route;
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
 
 		osip_message_t* options = nullptr;
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_options_build_request(m_pData->m_pCtx,
+		int ret = eXosip_options_build_request(m_pData->m_pCtx,
 			&options,
-			to.c_str(),
-			from.c_str(),
-			route.c_str());
+			sip_to.c_str(),
+			sip_from.c_str(),
+			sip_route.c_str());
 		
-		if (options)
+		if (ret == OSIP_SUCCESS)
 		{ 
-			if (!p->m_viaHost.empty())
-				SetViaHost(options, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(options, p->m_viaPort);
-			if (!p->m_contact.empty())
-				SetContact(options, p->m_contact.c_str());
-			eXosip_options_send_request(m_pData->m_pCtx, options);
+			SetVia(options, sip_via.c_str());
+			SetContact(options, sip_contact.c_str());
+			return eXosip_options_send_request(m_pData->m_pCtx, options);
 		}
 		
-		return (options != nullptr ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
-	int BaseSip::SendInvite(ESipCallParams& params)
+	int BaseSip::SendInvite(BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipCallParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+		auto& subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
+		auto& refresher = p.GetInfosParams(SIP_INFO_REFRESHER, "");
+		int expires = std::stoi(p.GetInfosParams(SIP_INFO_EXPIRES, "0"));
 
-		std::string from = std::string("sip:") + p->m_from;
-		std::string to = std::string("sip:") + p->m_to;
-		std::string route = p->m_route.empty() ? "" : std::string("sip:") + p->m_route;
+		if (from.empty() || to.empty() || refresher.empty() || expires <= 0)
+			return OSIP_BADPARAMETER;
+
+		std::string sip_from = std::string("sip:") + from;
+		std::string sip_to = std::string("sip:") + to;
+		std::string sip_route = std::string("sip:") + route;
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		const char* sip_subject = subject.empty() ? nullptr : subject.c_str();
+		auto& headers = p.GetHeaders();
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& sdp = p.GetInfosParams(SIP_INFO_CONTENT, "");
 
 		osip_message_t* invite = nullptr;
 		SipLock lock(m_pData->m_pCtx);
 		int ret = eXosip_call_build_initial_invite(m_pData->m_pCtx,
 			&invite,
-			to.c_str(),
-			from.c_str(),
-			route.c_str(),
-			p->m_subject.c_str());
-
-		/* 创建失败就返回 */
-		if (ret != OSIP_SUCCESS)
-			return SIP_ERROR;
-
-		if (!p->m_viaHost.empty())
-			SetViaHost(invite, p->m_viaHost.c_str());
-		if (p->m_viaPort > 0)
-			SetViaPort(invite, p->m_viaPort);
-		if (!p->m_contact.empty())
-			SetContact(invite, p->m_contact.c_str());
-		SetSessionExpires(invite, p->m_bIsUacRefresh, p->m_expires);
-
-		for(auto iter = p->m_headers.begin(); iter !=p->m_headers.end(); ++iter)
-			osip_message_replace_header(invite, iter->first.c_str(), iter->second.c_str());
-	
-		p->m_callid = GetCallidNumber(invite);
-
-		if (p->m_sdp.size() > 0)
-		{
-			osip_message_set_content_type(invite, "application/sdp");
-			osip_message_set_body(invite, p->m_sdp.c_str(), p->m_sdp.size());
-		}
-
-		p->m_cid = eXosip_call_send_initial_invite(m_pData->m_pCtx, invite);
-
-		return SIP_SUCCESS;
-	}
-
-	int BaseSip::SendRinging(ESipCallResponseParams& params)
-	{
-		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
-
-		SipCallResponseParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
-		
-		osip_message_t* answer = nullptr;
-		SipLock lock(m_pData->m_pCtx);
-		int ret = eXosip_call_build_answer(m_pData->m_pCtx, p->m_tid, 180, &answer); //这里直接写死180
+			sip_to.c_str(),
+			sip_from.c_str(),
+			sip_route.c_str(),
+			sip_subject);
 
 		if (ret == OSIP_SUCCESS)
 		{
-			if (p->m_via.size() > 0)
-				SetVia(answer, p->m_via.c_str());
-			if (!p->m_contact.empty())
-				SetContact(answer, p->m_contact.c_str());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
-				osip_message_replace_header(answer, iter->first.c_str(), iter->second.c_str());
+			SetVia(invite, sip_via.c_str());
+			SetContact(invite, sip_contact.c_str());
+			SetSessionExpires(invite, refresher.c_str(), expires);
 
-			ret = eXosip_call_send_answer(m_pData->m_pCtx, p->m_tid, 180, answer);
-		}
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(invite, iter->first.c_str(), iter->second.c_str());
 
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
-	}
-
-	int BaseSip::SendInviteResponse(ESipCallResponseParams& params)
-	{
-		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
-
-		SipCallResponseParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
-
-		osip_message_t* answer = nullptr;
-		SipLock lock(m_pData->m_pCtx);
-		eXosip_call_build_answer(m_pData->m_pCtx, p->m_tid, p->m_statusCode, &answer);
-
-		if (p->m_statusCode == 200)
-		{
-			osip_message_set_content_type(answer, "application/sdp");
-			osip_message_set_body(answer, p->m_sdp.c_str(), p->m_sdp.size());
-		}
-
-		if (p->m_via.size() > 0)
-			SetVia(answer, p->m_via.c_str());
-		if (!p->m_contact.empty())
-			SetContact(answer, p->m_contact.c_str());
-		for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
-			osip_message_replace_header(answer, iter->first.c_str(), iter->second.c_str());
-
-		eXosip_call_send_answer(m_pData->m_pCtx, p->m_tid, p->m_statusCode, answer);
-
-		return SIP_SUCCESS;
-	}
-
-	int BaseSip::SendAck(ESipCallParams& params)
-	{
-		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
-
-		SipCallParams* p = params.GetData();
-		if (!p->IsValid() || p->m_did <= 0)
-			return SIP_ERROR;
-
-		int ret = OSIP_SUCCESS;
-		SipLock lock(m_pData->m_pCtx);
-		//ret = eXosip_call_send_ack(m_pData->m_pCtx, p->m_did, nullptr);
-
-		osip_message_t* ack = nullptr;
-		ret = eXosip_call_build_ack(m_pData->m_pCtx, p->m_did, &ack);
-		if (ret == OSIP_SUCCESS)
-		{
-			if (!p->m_route.empty())
-				SetRequestUri(ack, p->m_route.c_str());
-			if (!p->m_viaHost.empty())
-				SetViaHost(ack, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(ack, p->m_viaPort);
-			if (!p->m_contact.empty())
-				SetContact(ack, p->m_contact.c_str());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
-				osip_message_replace_header(ack, iter->first.c_str(), iter->second.c_str());
-
-			if (!p->m_sdp.empty())
+			p.SetInfosParams(SIP_INFO_CALLID, GetCallidNumber(invite));
+			if (!sdp.empty())
 			{
-				osip_message_set_content_type(ack, "application/sdp");
-				osip_message_set_body(ack, p->m_sdp.c_str(), p->m_sdp.size());
+				osip_message_set_body(invite, sdp.c_str(), sdp.size());
+				if(content_type.empty())
+					osip_message_set_content_type(invite, "application/sdp");
+				else
+					osip_message_set_content_type(invite, content_type.c_str());
 			}
 
-			ret = eXosip_call_send_ack(m_pData->m_pCtx, p->m_did, ack);
+			int cid = eXosip_call_send_initial_invite(m_pData->m_pCtx, invite);
+			p.SetInfosParams(SIP_INFO_CID, std::to_string(cid));
+
+			if (cid > 0)
+				return OSIP_SUCCESS;
+			return OSIP_UNDEFINED_ERROR;
 		}
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
-	int BaseSip::SendUpdate(ESipCallParams& params)
+	int BaseSip::SendTrying(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipCallParams* p = params.GetData();
-		if (!p->IsValid() || p->m_did <= 0)
-			return SIP_ERROR;
+		int tid = std::stoi(p.GetInfosParams(SIP_INFO_TID, "0"));
+		if(tid <=0)
+			return OSIP_BADPARAMETER;
 
-		int ret = OSIP_SUCCESS;
+		auto& headers = p.GetHeaders();
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, "");
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+
+		osip_message_t* trying = nullptr;
 		SipLock lock(m_pData->m_pCtx);
-		osip_message_t* request = nullptr;
-		ret = eXosip_call_build_update(m_pData->m_pCtx, p->m_did, &request);
+		int ret = eXosip_call_build_answer(m_pData->m_pCtx, tid, SIP_TRYING, &trying);
 		if (ret == OSIP_SUCCESS)
 		{
-			if (!p->m_route.empty())
-				SetRequestUri(request, p->m_route.c_str());
-			if (!p->m_viaHost.empty())
-				SetViaHost(request, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(request, p->m_viaPort);
-			if (!p->m_contact.empty())
-				SetContact(request, p->m_contact.c_str());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
-				osip_message_replace_header(request, iter->first.c_str(), iter->second.c_str());
-
-			ret = eXosip_call_send_request(m_pData->m_pCtx, p->m_did, request);
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(trying, iter->first.c_str(), iter->second.c_str());
+			if (!sip_contact.empty())
+				SetContact(trying, sip_contact.c_str());
+			SetVia(trying, sip_via.c_str());
+			return eXosip_call_send_answer(m_pData->m_pCtx, tid, SIP_TRYING, trying);
 		}
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
-	int BaseSip::SendMessage(ESipMessageParams& params)
+	int BaseSip::SendRinging(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		int tid = std::stoi(p.GetInfosParams(SIP_INFO_TID, "0"));
+		if (tid <= 0)
+			return OSIP_BADPARAMETER;
 
-		return SendMessageMethod(params, "MESSAGE");
+		auto& headers = p.GetHeaders();
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, "");
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+
+		osip_message_t* ringing = nullptr;
+		SipLock lock(m_pData->m_pCtx);
+		int ret = eXosip_call_build_answer(m_pData->m_pCtx, tid, SIP_RINGING, &ringing);
+		if (ret == OSIP_SUCCESS)
+		{
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(ringing, iter->first.c_str(), iter->second.c_str());
+			if (!sip_contact.empty())
+				SetContact(ringing, sip_contact.c_str());
+			SetVia(ringing, sip_via.c_str());
+			return eXosip_call_send_answer(m_pData->m_pCtx, tid, SIP_RINGING, ringing);
+		}
+		return ret;
 	}
 
-	int BaseSip::SendInfo(ESipMessageParams& params)
+	int BaseSip::SendInviteResponse(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		int tid = std::stoi(p.GetInfosParams(SIP_INFO_TID, "0"));
+		if (tid <= 0)
+			return OSIP_BADPARAMETER;
 
-		return SendMessageMethod(params, "INFO");
+		auto& headers = p.GetHeaders();
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& sdp = p.GetInfosParams(SIP_INFO_CONTENT, "");
+		int status_code = std::stoi(p.GetInfosParams(SIP_INFO_STATUS_CODE, "0"));
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, "");
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		osip_message_t* response = nullptr;
+
+		SipLock lock(m_pData->m_pCtx);
+		int ret = eXosip_call_build_answer(m_pData->m_pCtx, tid, status_code, &response);
+		if (ret == OSIP_SUCCESS)
+		{
+			if (status_code == SIP_OK)
+			{
+				if (!sdp.empty())
+				{
+					osip_message_set_body(response, sdp.c_str(), sdp.size());
+					if (content_type.empty())
+						osip_message_set_content_type(response, "application/sdp");
+					else
+						osip_message_set_content_type(response, content_type.c_str());
+				}
+			}
+
+			if (!sip_contact.empty())
+				SetContact(response, sip_contact.c_str());
+			SetVia(response, sip_via.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(response, iter->first.c_str(), iter->second.c_str());
+
+			return eXosip_call_send_answer(m_pData->m_pCtx, tid, status_code, response);
+		}
+
+		return ret;
 	}
 
-	int BaseSip::SendCallOptions(ESipCallMessageParams& params)
+	int BaseSip::SendAck(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipCallMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+		auto& subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
+		int did = std::stoi(p.GetInfosParams(SIP_INFO_DID, "0"));
 
-		int ret = OSIP_SUCCESS;
+		if (from.empty() || to.empty() || did <= 0)
+			return OSIP_BADPARAMETER;
+
+		auto& headers = p.GetHeaders();
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& sdp = p.GetInfosParams(SIP_INFO_CONTENT, "");
+		osip_message_t* ack = nullptr;
+
+		SipLock lock(m_pData->m_pCtx);		
+		int ret = eXosip_call_build_ack(m_pData->m_pCtx, did, &ack);
+		if (ret == OSIP_SUCCESS)
+		{
+			if (!route.empty())
+				SetRequestUri(ack, route.c_str());
+			SetVia(ack, sip_via.c_str());
+			SetContact(ack, sip_contact.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(ack, iter->first.c_str(), iter->second.c_str());
+
+			if (!sdp.empty())
+			{
+				osip_message_set_body(ack, sdp.c_str(), sdp.size());
+				if (content_type.empty())
+					osip_message_set_content_type(ack, "application/sdp");
+				else
+					osip_message_set_content_type(ack, content_type.c_str());
+			}
+
+			return eXosip_call_send_ack(m_pData->m_pCtx, did, ack);
+		}
+		return ret;
+	}
+
+	int BaseSip::SendUpdate(const BaseSipInfos& p)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return OSIP_API_NOT_INITIALIZED;
+
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+		auto& subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
+		int did = std::stoi(p.GetInfosParams(SIP_INFO_DID, "0"));
+
+		if (from.empty() || to.empty() || did <= 0)
+			return OSIP_BADPARAMETER;
+
+		auto& headers = p.GetHeaders();
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& sdp = p.GetInfosParams(SIP_INFO_CONTENT, "");
+		osip_message_t* update = nullptr;
+
+		SipLock lock(m_pData->m_pCtx);		
+		int ret = eXosip_call_build_update(m_pData->m_pCtx, did, &update);
+		if (ret == OSIP_SUCCESS)
+		{
+			if (!route.empty())
+				SetRequestUri(update, route.c_str());
+			SetVia(update, sip_via.c_str());
+			SetContact(update, sip_contact.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
+				osip_message_replace_header(update, iter->first.c_str(), iter->second.c_str());
+
+			return eXosip_call_send_request(m_pData->m_pCtx, did, update);
+		}
+		return ret;
+	}
+
+	int BaseSip::SendMessage(const BaseSipInfos& p)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return OSIP_API_NOT_INITIALIZED;
+
+		return SendMessageMethod(p, "MESSAGE");
+	}
+
+	int BaseSip::SendCallOptions(const BaseSipInfos& p)
+	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return OSIP_API_NOT_INITIALIZED;
+
+		int did = std::stoi(p.GetInfosParams(SIP_INFO_DID, "0"));
+		if (did <= 0)
+			return OSIP_BADPARAMETER;
+
+		auto& headers = p.GetHeaders();
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, "");
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, "");
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
 		osip_message_t* options = nullptr;
+
 		SipLock lock(m_pData->m_pCtx);
-		ret = eXosip_call_build_options(m_pData->m_pCtx, p->m_did, &options);
+		int ret = eXosip_call_build_options(m_pData->m_pCtx, did, &options);
 		if (ret == OSIP_SUCCESS)
 		{
-			//TODO
-			//暂不清楚呼叫内的OPTIONS有什么作用
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			if (!route.empty())
+				SetRequestUri(options, route.c_str());
+			if (!sip_contact.empty())
+				SetContact(options, sip_contact.c_str());
+			SetVia(options, sip_via.c_str());			
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
 				osip_message_replace_header(options, iter->first.c_str(), iter->second.c_str());
-			ret = eXosip_call_send_request(m_pData->m_pCtx, p->m_did, options);
+
+			return eXosip_call_send_request(m_pData->m_pCtx, did, options);
 		}
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
-	int BaseSip::SendCallMessage(ESipCallMessageParams& params)
+	int BaseSip::SendCallMessage(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipCallMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
-
-		return SendCallMessageMethod(params, "MESSAGE");
+		return SendCallMessageMethod(p, "MESSAGE");
 	}
 
-	int BaseSip::SendCallInfo(ESipCallMessageParams& params)
+	int BaseSip::SendCallInfo(const BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipCallMessageParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
-
-		return SendCallMessageMethod(params, "INFO");
+		return SendCallMessageMethod(p, "INFO");
 	}
 
-	int BaseSip::SendSubscribe(ESipSuscribeParams& params)
+	int BaseSip::SendSubscribe(BaseSipInfos& p)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
 
-		SipSuscribeParams* p = params.GetData();
-		if (!p->IsValid())
-			return SIP_ERROR;
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+		auto& subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
 
-		std::string from = std::string("sip:") + p->m_from;
-		std::string to = std::string("sip:") + p->m_to;
-		std::string route = p->m_route.empty() ? "" : std::string("sip:") + p->m_route;
+		if (from.empty() || to.empty())
+			return OSIP_BADPARAMETER;
+
+		std::string sip_from = std::string("sip:") + from;
+		std::string sip_to = std::string("sip:") + to;
+		std::string sip_route = std::string("sip:") + route;
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		const char* sip_subject = subject.empty() ? nullptr : subject.c_str();
+		auto& headers = p.GetHeaders();
+		int expires = std::stoi(p.GetInfosParams(SIP_INFO_EXPIRES, "0"));
+		auto& event = p.GetInfosParams(SIP_INFO_SUBSCRIBE_EVENT, "presence;id=presence");
+		auto& state = p.GetInfosParams(SIP_INFO_SUBSCRIBE_STATE, "active");
 
 		osip_message_t* subscribe = nullptr;
 		SipLock lock(m_pData->m_pCtx);
 		int sid = eXosip_subscription_build_initial_subscribe(
 			m_pData->m_pCtx, 
 			&subscribe, 
-			to.c_str(), 
-			from.c_str(), 
-			route.c_str(), 
-			p->m_event.c_str(), 
-			p->m_expires);
+			sip_to.c_str(),
+			sip_from.c_str(),
+			sip_route.c_str(),
+			event.c_str(),
+			expires);
 
 		if (sid > 0)
 		{
 			SetCseqNumber(subscribe, 1);
-			SetSubscribeEvent(subscribe, "presence;id=presence");
-			SetSubscribeState(subscribe, "active");
-
-			if (!p->m_route.empty())
-				SetRequestUri(subscribe, p->m_route.c_str());
-			if (!p->m_viaHost.empty())
-				SetViaHost(subscribe, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(subscribe, p->m_viaPort);
-			if (!p->m_contact.empty())
-				SetContact(subscribe, p->m_contact.c_str());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			//SetSubscribeEvent(subscribe, "presence;id=presence");
+			SetSubscribeState(subscribe, state.c_str());
+			SetSubject(subscribe, sip_subject);
+			SetVia(subscribe, sip_via.c_str());
+			SetContact(subscribe, sip_contact.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
 				osip_message_replace_header(subscribe, iter->first.c_str(), iter->second.c_str());
 
 			int ret = eXosip_subscription_send_initial_request(m_pData->m_pCtx, subscribe);
 			if (ret == OSIP_SUCCESS)
 			{
-				p->m_sid = sid;
-				p->m_callid = GetCallidNumber(subscribe);
-				return SIP_SUCCESS;
+				p.SetInfosParams(SIP_INFO_SID, std::to_string(sid));
+				p.SetInfosParams(SIP_INFO_CALLID, GetCallidNumber(subscribe));
 			}
+			return ret;
 		}
 
-		return SIP_ERROR;
+		return OSIP_UNDEFINED_ERROR;
 	}
 
 	int BaseSip::SendSubscribeResponse(int tid, int statusCode)
 	{
+		if (!m_pData || !m_pData->m_pCtx)
+			return OSIP_API_NOT_INITIALIZED;
+
+		if (tid <= 0)
+			return OSIP_BADPARAMETER;
+
 		osip_message_t* answer = nullptr;
 
 		SipLock lock(m_pData->m_pCtx);
 		int ret = eXosip_insubscription_build_answer(m_pData->m_pCtx, tid, statusCode, &answer);
 		if (ret == OSIP_SUCCESS)
 		{
-			ret = eXosip_insubscription_send_answer(m_pData->m_pCtx, tid, statusCode, answer);
+			return eXosip_insubscription_send_answer(m_pData->m_pCtx, tid, statusCode, answer);
 		}
 
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
 	int BaseSip::RemoveRegister(int rid)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
+
+		if (rid <= 0)
+			return OSIP_BADPARAMETER;
 
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_register_remove(m_pData->m_pCtx, rid);
-
-		return SIP_SUCCESS;
+		return eXosip_register_remove(m_pData->m_pCtx, rid);
 	}
 
-	int BaseSip::RemoveSubscribe(int did)
+	int BaseSip::RemoveSubscribe(int sid)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_BADPARAMETER;
+
+		if (sid <= 0)
+			return OSIP_BADPARAMETER;
 
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_subscription_remove(m_pData->m_pCtx, did);
-
-		return SIP_SUCCESS;
+		return eXosip_subscription_remove(m_pData->m_pCtx, sid);
 	}
 
-	int BaseSip::RemoveInSubscribe(int did)
+	int BaseSip::RemoveInSubscribe(int nid)
 	{
 		if (!m_pData || !m_pData->m_pCtx)
-			return SIP_ERROR;
+			return OSIP_API_NOT_INITIALIZED;
+
+		if (nid <= 0)
+			return OSIP_BADPARAMETER;
 
 		SipLock lock(m_pData->m_pCtx);
-		eXosip_insubscription_remove(m_pData->m_pCtx, did);
-
-		return SIP_SUCCESS;
+		return eXosip_insubscription_remove(m_pData->m_pCtx, nid);
 	}
 
-	int BaseSip::SendMessageMethod(ESipMessageParams& params, const char* method)
+	int BaseSip::SendMessageMethod(const BaseSipInfos& p, const char* method)
 	{
-		SipMessageParams* p = params.GetData();
+		auto& from = p.GetInfosParams(SIP_INFO_FROM, "");
+		auto& to = p.GetInfosParams(SIP_INFO_TO, "");
+		auto& route = p.GetInfosParams(SIP_INFO_ROUTE, to);
+
+		if (from.empty() || to.empty())
+			return OSIP_BADPARAMETER;
+
+		std::string sip_from = std::string("sip:") + from;
+		std::string sip_to = std::string("sip:") + to;
+		std::string sip_route = std::string("sip:") + route;
+		std::string com_str = GetUserInString(from.c_str()) + "@" + m_pData->m_localAddr;
+		auto& sip_contact = p.GetInfosParams(SIP_INFO_CONTACT, com_str);
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		auto& sip_subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
+		auto& headers = p.GetHeaders();
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& content = p.GetInfosParams(SIP_INFO_CONTENT, "");
+		auto& encoding = p.GetInfosParams(SIP_INFO_ENCODING, "");
 		osip_message_t* msg = nullptr;
-		std::string from = std::string("sip:") + p->m_from;
-		std::string to = std::string("sip:") + p->m_to;
-		std::string route = p->m_route.empty() ? "" : std::string("sip:") + p->m_route;
 
-		int ret = OSIP_SUCCESS;
 		SipLock lock(m_pData->m_pCtx);
-		ret = eXosip_message_build_request(
+		int ret = eXosip_message_build_request(
 			m_pData->m_pCtx,
 			&msg,
 			method,
-			to.c_str(),
-			from.c_str(),
-			route.c_str());
+			sip_to.c_str(),
+			sip_from.c_str(),
+			sip_route.c_str());
 
 		if (ret == OSIP_SUCCESS)
 		{
-			if (!p->m_type.empty())
-				SetContentType(msg, p->m_type.c_str());
-			if (!p->m_endcoding.empty())
-				SetContentEncoding(msg, p->m_endcoding.c_str());
-			if (!p->m_content.empty())
-				SetContent(msg, p->m_content.c_str(), p->m_content.size());
-			if (!p->m_viaHost.empty())
-				SetViaHost(msg, p->m_viaHost.c_str());
-			if (p->m_viaPort > 0)
-				SetViaPort(msg, p->m_viaPort);
-			if (!p->m_contact.empty())
-				SetContact(msg, p->m_contact.c_str());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			SetContentType(msg, content_type.c_str());
+			SetContentEncoding(msg, encoding.c_str());
+			SetContent(msg, content.c_str(), content.size());
+			SetVia(msg, sip_via.c_str());
+			SetContact(msg, sip_contact.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
 				osip_message_replace_header(msg, iter->first.c_str(), iter->second.c_str());
 
-			ret = eXosip_message_send_request(m_pData->m_pCtx, msg);
+			return eXosip_message_send_request(m_pData->m_pCtx, msg);
 		}
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
-	int BaseSip::SendCallMessageMethod(ESipCallMessageParams& params, const char* method)
+	int BaseSip::SendCallMessageMethod(const BaseSipInfos& p, const char* method)
 	{
-		SipCallMessageParams* p = params.GetData();
+		int did = std::stoi(p.GetInfosParams(SIP_INFO_DID, "0"));
+		if (did <= 0)
+			return OSIP_BADPARAMETER;
+
+		auto& sip_via = p.GetInfosParams(SIP_INFO_VIA, m_pData->m_localAddr);
+		auto& sip_subject = p.GetInfosParams(SIP_INFO_SUBJECT, "");
+		auto& headers = p.GetHeaders();
+		auto& content_type = p.GetInfosParams(SIP_INFO_CONTENT_TYPE, "");
+		auto& content = p.GetInfosParams(SIP_INFO_CONTENT, "");
+		auto& encoding = p.GetInfosParams(SIP_INFO_ENCODING, "");
 		osip_message_t* msg = nullptr;
 
-		int ret = OSIP_SUCCESS;
 		SipLock lock(m_pData->m_pCtx);
-		ret = eXosip_call_build_request(m_pData->m_pCtx, p->m_did, method, &msg);
+		int ret = eXosip_call_build_request(m_pData->m_pCtx, did, method, &msg);
 		if (ret == OSIP_SUCCESS)
 		{
-			if (!p->m_type.empty())
-				SetContentType(msg, p->m_type.c_str());
-			if (!p->m_endcoding.empty())
-				SetContentEncoding(msg, p->m_endcoding.c_str());
-			if (!p->m_content.empty())
-				SetContent(msg, p->m_content.c_str(), p->m_content.size());
-			for (auto iter = p->m_headers.begin(); iter != p->m_headers.end(); ++iter)
+			SetContentType(msg, content_type.c_str());
+			SetContentEncoding(msg, encoding.c_str());
+			SetContent(msg, content.c_str(), content.size());
+			SetVia(msg, sip_via.c_str());
+			for (auto iter = headers.begin(); iter != headers.end(); ++iter)
 				osip_message_replace_header(msg, iter->first.c_str(), iter->second.c_str());
-			ret = eXosip_call_send_request(m_pData->m_pCtx, p->m_did, msg);
+
+			return eXosip_call_send_request(m_pData->m_pCtx, did, msg);
 		}
-		return (ret == OSIP_SUCCESS ? SIP_SUCCESS : SIP_ERROR);
+		return ret;
 	}
 
 	static void ParseSipMsgInfo(SipMsgInfo& info, osip_message_t* msg)
@@ -1119,9 +1211,9 @@ namespace sip
 			}
 
 			/* 暂时不处理notification */
-			case EXOSIP_NOTIFICATION_NOANSWER: //notify超时没有收到响应   announce no answer   
-			case EXOSIP_NOTIFICATION_PROCEEDING: //处理中  announce a 1xx 
-			case EXOSIP_NOTIFICATION_ANSWERED:  //接收到响应  announce a 200ok  
+			case EXOSIP_NOTIFICATION_NOANSWER:       //notify超时没有收到响应   announce no answer   
+			case EXOSIP_NOTIFICATION_PROCEEDING:     //处理中  announce a 1xx 
+			case EXOSIP_NOTIFICATION_ANSWERED:       //接收到响应  announce a 200ok  
 			case EXOSIP_NOTIFICATION_REDIRECTED:     //收到一个redirection  announce a redirection
 			case EXOSIP_NOTIFICATION_REQUESTFAILURE: //请求失败
 			case EXOSIP_NOTIFICATION_SERVERFAILURE:	 //服务失败

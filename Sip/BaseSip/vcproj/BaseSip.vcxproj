@@ -142,13 +142,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\BaseSip.cpp" />
+    <ClCompile Include="..\src\BaseSipInfos.cpp" />
     <ClCompile Include="..\src\SipCommon.cpp" />
-    <ClCompile Include="..\src\SipMessage.cpp" />
-    <ClCompile Include="..\src\SipMessageHelper.cpp" />
     <ClCompile Include="..\src\SipSend.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\BaseSip\BaseSip.h" />
+    <ClInclude Include="..\include\BaseSip\BaseSipInfos.h" />
     <ClInclude Include="..\include\BaseSip\ESipSend.h" />
     <ClInclude Include="..\include\BaseSip\internal\SipCommon.h" />
     <ClInclude Include="..\include\BaseSip\internal\SipMessage.h" />

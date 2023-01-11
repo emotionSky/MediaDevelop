@@ -52,15 +52,13 @@ namespace sip
 
 	static inline std::string GetUserInString(const char* str)
 	{
+		if (!str || str[0] == '\0')
+			return "";
 		//str alice@10.10.1.12:5060
 		std::string user;
-		if (str)
-		{
-			char buf[64] = { 0 };
-			int ret = sscanf(str, "%[^@]", buf);
-			if (ret == 1)
-				user = buf;
-		}
+		char buf[64] = { 0 };
+		if (sscanf(str, "%[^@]", buf) == 1)
+			user = buf;
 		return user;
 	}
 
