@@ -3,7 +3,7 @@
 #include <QDebug>
 #include <QFile>
 
-constexpr char FILE_NAME[] = "D:\\Git\\MediaDevelop\\Qt\\resource\\多远都要在一起_s16le_ch2_44100.pcm";
+constexpr char FILE_NAME[] = "D:\\Git\\MediaDevelop\\Qt\\resource\\mom_s16le_ch2_44100.pcm";
 constexpr int SAMPLE_RATE = 44100;
 constexpr int FORMAT = AUDIO_S16; //
 constexpr int SAMPLE_SIZE = SDL_AUDIO_BITSIZE(FORMAT);
